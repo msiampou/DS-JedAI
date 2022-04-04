@@ -154,6 +154,8 @@ class ConfigurationParser {
 					nextOption(map ++ Map(InputConfigurations.CONF_VIOLATIONS -> value), tail)
 				case "-precisionLimit" :: value :: tail =>
 					nextOption(map ++ Map(InputConfigurations.CONF_PRECISION_LIMIT -> value), tail)
+				case "-iter" :: value :: tail =>
+					nextOption(map ++ Map(InputConfigurations.CONF_ITERATIONS -> value), tail)
 
 				case key :: tail =>
 					nextOption(Map(InputConfigurations.CONF_UNRECOGNIZED -> key), tail)
@@ -249,7 +251,8 @@ class ConfigurationParser {
 						case Failure(_) => Some(ConfigurationErrorMessage("Not valid value for precision limit"))
 						case _ => None
 					}
-
+				case InputConfigurations.CONF_ITERATIONS if !(value forall Character.isDigit) =>
+					Some(ConfigurationErrorMessage("Not valid value for num iterations"))
 
 				case InputConfigurations.CONF_UNRECOGNIZED =>
 					Some(ConfigurationErrorMessage(s"Unrecognized argument '$value'"))

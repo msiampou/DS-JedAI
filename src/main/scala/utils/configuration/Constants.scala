@@ -124,6 +124,9 @@ object Constants {
 		val CONF_BATCH_SIZE = "batchSize"
 		val CONF_PRECISION_LIMIT = "precisionLimit"
 		val CONF_VIOLATIONS = "violations"
+
+		// SUPERVISED PROGRESSIVE GIANT
+		val CONF_ITERATIONS = "num_iterations"
 	}
 
 	object GridType extends Enumeration{
@@ -164,7 +167,7 @@ object Constants {
 		val RECIPROCAL_TOPK: ProgressiveAlgorithm.Value = Value("RECIPROCAL_TOPK")
 		val RANDOM: ProgressiveAlgorithm.Value = Value("RANDOM")
 		val EARLY_STOPPING: ProgressiveAlgorithm.Value = Value("EARLY_STOPPING")
-
+		val SUPERVISED: ProgressiveAlgorithm.Value = Value("SUPERVISED")
 
 		def exists(s: String): Boolean = values.exists(_.toString == s)
 	}

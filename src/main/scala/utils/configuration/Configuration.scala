@@ -81,6 +81,9 @@ sealed trait ConfigurationT {
 
     def getPrecisionLimit: Float =  configurations.getOrElse(InputConfigurations.CONF_PRECISION_LIMIT, "0.1f").toFloat
 
+    // parse CONF_ITERATIONS arg used by Supervised Progressive GIAnt
+    def getIterations: Int = configurations.getOrElse(InputConfigurations.CONF_ITERATIONS, "1").toInt
+
     def print(log: Logger): Unit = {
         log.info(s"DS-JEDAI: GridType: $getGridType")
         log.info(s"DS-JEDAI: Relation: $relation")
@@ -90,26 +93,28 @@ sealed trait ConfigurationT {
         getExportPath.foreach(path => log.info(s"DS-JEDAI: Export Path: $path"))
     }
 
-
     def printProgressive(log: Logger): Unit = {
         print(log)
         log.info(s"DS-JEDAI: Progressive Algorithm: $getProgressiveAlgorithm")
-        log.info(s"DS-JEDAI: Weighting Scheme: $getWS")
-        log.info(s"DS-JEDAI: Input Budget: $getBudget")
-        if (getProgressiveAlgorithm == ProgressiveAlgorithm.EARLY_STOPPING) {
-            log.info(s"DS-JEDAI: Main Weighting Function: JS")
-            log.info(s"DS-JEDAI: Secondary Weighting Function: CF")
-            log.info(s"DS-JEDAI: Last Weighting Function: MBRO")
-            log.info(s"DS-JEDAI: BATCH SIZE: $getBatchSize")
-            log.info(s"DS-JEDAI: PRECISION LIMIT: $getPrecisionLimit")
-            log.info(s"DS-JEDAI: VIOLATIONS: $getViolations")
+        if (getProgressiveAlgorithm == ProgressiveAlgorithm.SUPERVISED) {
+            // Supervised Progressive GIAnt has only budget and iterations specification
+            log.info(s"DS-JEDAI: Input Budget: $getBudget")
+            log.info(s"DS-JEDAI: Number of Iterations: $getIterations")
+        } else {
+            log.info(s"DS-JEDAI: Weighting Scheme: $getWS")
+            log.info(s"DS-JEDAI: Input Budget: $getBudget")
+            if (getProgressiveAlgorithm == ProgressiveAlgorithm.EARLY_STOPPING) {
+                log.info(s"DS-JEDAI: Main Weighting Function: JS")
+                log.info(s"DS-JEDAI: Secondary Weighting Function: CF")
+                log.info(s"DS-JEDAI: Last Weighting Function: MBRO")
+                log.info(s"DS-JEDAI: BATCH SIZE: $getBatchSize")
+                log.info(s"DS-JEDAI: PRECISION LIMIT: $getPrecisionLimit")
+                log.info(s"DS-JEDAI: VIOLATIONS: $getViolations")
+            } else {
+                log.info(s"DS-JEDAI: Main Weighting Function: ${getMainWF}")
+                getSecondaryWF.foreach(swf => log.info(s"DS-JEDAI: Secondary Weighting Function: $swf"))
+            }
         }
-        else {
-            log.info(s"DS-JEDAI: Main Weighting Function: ${getMainWF}")
-            getSecondaryWF.foreach(swf => log.info(s"DS-JEDAI: Secondary Weighting Function: $swf"))
-        }
-
-
     }
 }
 
