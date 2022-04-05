@@ -1,5 +1,6 @@
 package experiments.progressive
 
+import linkers.progressive.DistributedProgressiveInterlinking
 import model.TileGranularities
 import model.approximations.{GeometryApproximationT, GeometryToApproximation}
 import model.entities.{EntityT, GeometryToEntity}
@@ -45,7 +46,7 @@ object SupervisedExp {
       case Right(configuration) => Some(configuration)
     }
     val conf = configurationOpt.get
-    conf.printProgressive(log)
+    conf.printSupervised(log)
 
     val partitions: Int = conf.getPartitions
     val gridType: GridType.GridType = conf.getGridType
@@ -75,5 +76,9 @@ object SupervisedExp {
 
     val partitionBorders = partitioner.getPartitionsBorders(theta)
     log.info(s"DS-JEDAI: Source was loaded into ${sourceRDD.getNumPartitions} partitions")
+
+//    val matchingStartTime = Calendar.getInstance().getTimeInMillis
+//    val linkers = DistributedProgressiveInterlinking.initializeProgressiveLinkers(sourceRDD, targetRDD,
+//      partitionBorders, theta, partitioner, progressiveAlg, budget, sourceCount)
   }
 }
