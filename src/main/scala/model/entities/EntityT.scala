@@ -20,6 +20,10 @@ trait EntityT extends Serializable {
 
     def getEnvelopeInternal(): Envelope = approximation.getEnvelopeInternal()
 
+    def getNumPoints: Int = geometry.getNumPoints()
+
+    def getLength: Double = geometry.getLength()
+
     def getMinX: Double = approximation.getMinX
     def getMaxX: Double = approximation.getMaxX
     def getMinY: Double = approximation.getMinY

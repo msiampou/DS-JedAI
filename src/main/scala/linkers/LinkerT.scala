@@ -2,7 +2,7 @@ package linkers
 
 import model.entities.EntityT
 import model.structures.SpatialIndex
-import model.{IM, TileGranularities, structures}
+import model.{FeatureSet, IM, TileGranularities, structures}
 import org.locationtech.jts.geom.Envelope
 import utils.configuration.Constants.Relation.Relation
 

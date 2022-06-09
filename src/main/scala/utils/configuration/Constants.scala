@@ -1,5 +1,7 @@
 package utils.configuration
 
+import org.apache.spark.sql.types.{DoubleType, StructField, StructType}
+
 /**
  * @author George Mandilaras (NKUA)
  */
@@ -85,6 +87,9 @@ object Constants {
 		// inverse sum of points
 		val ISP: WeightingFunction.Value = Value("ISP")
 
+		// linear regression logits
+		val LR: WeightingFunction.Value = Value("LR")
+
 		def exists(s: String): Boolean = values.exists(_.toString == s)
 	}
 
@@ -167,7 +172,7 @@ object Constants {
 		val RECIPROCAL_TOPK: ProgressiveAlgorithm.Value = Value("RECIPROCAL_TOPK")
 		val RANDOM: ProgressiveAlgorithm.Value = Value("RANDOM")
 		val EARLY_STOPPING: ProgressiveAlgorithm.Value = Value("EARLY_STOPPING")
-		
+		val SUPERVISED: ProgressiveAlgorithm.Value = Value("SUPERVISED")
 		def exists(s: String): Boolean = values.exists(_.toString == s)
 	}
 
@@ -193,4 +198,44 @@ object Constants {
 		}
 	}
 
+	sealed trait FeaturePos extends Serializable {val value: Int}
+	case object SourceArea extends FeaturePos {val value = 0}
+	case object TargetArea extends FeaturePos {val value = 1}
+	case object IntersectionArea extends FeaturePos {val value = 2}
+	case object SourceTiles extends FeaturePos {val value = 3}
+	case object TargetTiles extends FeaturePos {val value = 4}
+	case object CommonTiles extends FeaturePos {val value = 5}
+	case object SourceBoundPoints extends FeaturePos {val value = 6}
+	case object TargetBoundPoints extends FeaturePos {val value = 7}
+	case object SourceLen extends FeaturePos {val value = 8}
+	case object TargetLen extends FeaturePos {val value = 9}
+	case object SourceTotalCooccurrences extends FeaturePos {val value = 10}
+	case object SourceDistCooccurrences extends FeaturePos {val value = 11}
+	case object SourceRealCooccurrences extends FeaturePos {val value = 12}
+	case object TargetTotalCooccurrences extends FeaturePos {val value = 13}
+	case object TargetDistCooccurrences extends FeaturePos {val value = 14}
+	case object TargetRealCooccurrences extends FeaturePos {val value = 15}
+	case object Label extends FeaturePos {val value = 16}
+
+	val schema = new StructType()
+		.add(StructField("_1", DoubleType, false))
+		.add(StructField("_2", DoubleType, false))
+		.add(StructField("_3", DoubleType, false))
+		.add(StructField("_4", DoubleType, false))
+		.add(StructField("_5", DoubleType, false))
+		.add(StructField("_6", DoubleType, false))
+		.add(StructField("_7", DoubleType, false))
+		.add(StructField("_8", DoubleType, false))
+		.add(StructField("_9", DoubleType, false))
+		.add(StructField("_10", DoubleType, false))
+		.add(StructField("_11", DoubleType, false))
+		.add(StructField("_12", DoubleType, false))
+		.add(StructField("_13", DoubleType, false))
+		.add(StructField("_14", DoubleType, false))
+		.add(StructField("_15", DoubleType, false))
+		.add(StructField("_16", DoubleType, false))
+		.add(StructField("label", DoubleType, false))
+
+	val featureCols = Array("_1" , "_2" , "_2" , "_3" , "_4" , "_4" , "_6" , "_7" , "_8" , "_9" , "_10" , "_11",
+		"_12", "_13", "_14", "_15", "_16")
 }

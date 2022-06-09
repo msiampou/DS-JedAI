@@ -2,8 +2,15 @@ package linkers.progressive
 
 import cats.implicits._
 import model.entities.EntityT
-import model.{IM, TileGranularities}
+import model.weightedPairs.SamplePairT
+import model.{FeatureSet, IM, TileGranularities}
+import org.apache.log4j.{Level, LogManager, Logger}
+import org.apache.spark.ml.classification.LogisticRegression
+import org.apache.spark.ml.feature.VectorAssembler
 import org.apache.spark.rdd.RDD
+import org.apache.spark.sql
+import org.apache.spark.sql.types.{DoubleType, StructField, StructType}
+import org.apache.spark.sql.{Dataset, Row, SparkSession}
 import org.locationtech.jts.geom.Envelope
 import utils.configuration.Constants
 import utils.configuration.Constants.ProgressiveAlgorithm.ProgressiveAlgorithm
@@ -56,9 +63,8 @@ object DistributedProgressiveInterlinking {
         val joinedRDD: RDD[(Int, (Iterable[EntityT], Iterable[EntityT]))] = source.cogroup(target, gridPartitioner.hashPartitioner)
         joinedRDD.map { case (pid: Int,  (sourceP: Iterable[EntityT], targetP:Iterable[EntityT])) =>
             val partition = partitionBorders(pid)
-
             progressiveAlgorithm match {
-                case ProgressiveAlgorithm.RANDOM =>
+                case  ProgressiveAlgorithm.RANDOM =>
                     RandomScheduling(sourceP.toArray, targetP, theta, partition, mainWF, secondaryWF, budget, sourceCount,
                         ws, totalBlocks)
                 case ProgressiveAlgorithm.TOPK =>
@@ -73,6 +79,9 @@ object DistributedProgressiveInterlinking {
                 case ProgressiveAlgorithm.EARLY_STOPPING =>
                     EarlyStoppingLinker(sourceP.toArray, targetP, theta, partition, budget, sourceCount, totalBlocks, batchSize,
                         maxViolations, precisionLevel)
+                case ProgressiveAlgorithm.SUPERVISED =>
+                    Supervised(sourceP.toArray, targetP, theta, partition, mainWF, secondaryWF, budget, sourceCount,
+                        ws, totalBlocks)
                 case ProgressiveAlgorithm.PROGRESSIVE_GIANT | _ =>
                     ProgressiveGIAnt(sourceP.toArray, targetP, theta, partition, mainWF, secondaryWF, budget, sourceCount,
                         ws, totalBlocks)
@@ -132,7 +141,6 @@ object DistributedProgressiveInterlinking {
      * @return the Scheduling, the Verification and the Total Matching times as a Tuple
      */
     def time(progressiveLinkersRDD: RDD[ProgressiveLinkerT]): (Double, Double, Double) ={
-
         // execute and time scheduling step
         val schedulingStart = Calendar.getInstance().getTimeInMillis
         val prioritizationResults = progressiveLinkersRDD.map{ linker => linker.prioritize(Relation.DE9IM)}
@@ -287,4 +295,17 @@ object DistributedProgressiveInterlinking {
             totalOverlaps, totalTouches, totalWithin, verifications, qualifiedPairs)
     }
 
+    def supervisedPreprocessing(linkersRDD: RDD[ProgressiveLinkerT]): RDD[FeatureSet] = {
+        linkersRDD.map(linker => linker.buildClassifier)
+    }
+
+    def supervisedTrain(rowRDD: RDD[Row], spark: SparkSession): sql.DataFrame = {
+        val dF = spark.createDataFrame(rowRDD, Constants.schema)
+
+        val assembler = new VectorAssembler().setInputCols(Constants.featureCols).setOutputCol("features")
+        val trainDF = assembler.transform(dF)
+
+        val model = new LogisticRegression().fit(trainDF)
+        model.transform(trainDF)
+    }
 }

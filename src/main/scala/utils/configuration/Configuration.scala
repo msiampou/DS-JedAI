@@ -33,7 +33,9 @@ sealed trait ConfigurationT {
 
     def getTheta: ThetaOption = ThetaOption.withName(configurations.getOrElse(InputConfigurations.CONF_THETA_GRANULARITY, "avg"))
 
-    def getMainWF: WeightingFunction = WeightingFunction.withName(configurations.getOrElse(InputConfigurations.CONF_MAIN_WF, "JS"))
+    def getMainWF: WeightingFunction =
+        if (getProgressiveAlgorithm == ProgressiveAlgorithm.SUPERVISED) WeightingFunction.withName("LR")
+        else WeightingFunction.withName(configurations.getOrElse(InputConfigurations.CONF_MAIN_WF, "JS"))
 
     def getSecondaryWF: Option[WeightingFunction] = configurations.get(InputConfigurations.CONF_SECONDARY_WF) match {
         case Some(wf) => Option(WeightingFunction.withName(wf))
@@ -111,13 +113,13 @@ sealed trait ConfigurationT {
         }
     }
 
-    // print configuration details regarding Supervised GIAnt
-    def printSupervised(log: Logger): Unit = {
-        print(log)
-        log.info(s"DS-JEDAI: Algorithm: Supervised GIAnt")
-        log.info(s"DS-JEDAI: Input Budget: $getBudget")
-        log.info(s"DS-JEDAI: Number of Iterations: $getIterations")
-    }
+//    // print configuration details regarding Supervised GIAnt
+//    def printSupervised(log: Logger): Unit = {
+//        print(log)
+//        log.info(s"DS-JEDAI: Algorithm: Supervised GIAnt")
+//        log.info(s"DS-JEDAI: Input Budget: $getBudget")
+//        log.info(s"DS-JEDAI: Number of Iterations: $getIterations")
+//    }
 }
 
 

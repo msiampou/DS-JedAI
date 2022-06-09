@@ -1,15 +1,19 @@
 package linkers.progressive
 
 import linkers.LinkerT
-import model.IM
+import model.{FeatureSet, IM}
 import model.entities.EntityT
 import model.structures.{ComparisonPQ, SpatialIndex}
-import model.weightedPairs.WeightedPairFactory
+import model.weightedPairs.{SamplePairT, WeightedPairFactory}
 import org.locationtech.jts.geom.Envelope
 import utils.configuration.Constants
 import utils.configuration.Constants.Relation
 import utils.configuration.Constants.Relation.Relation
 import utils.configuration.Constants.WeightingFunction.WeightingFunction
+import org.apache.spark.ml.linalg.Vectors
+import org.apache.spark.rdd.RDD
+import org.apache.spark.sql
+import org.apache.spark.sql.{Row, SparkSession}
 
 trait ProgressiveLinkerT extends LinkerT{
     val budget: Int
@@ -60,7 +64,7 @@ trait ProgressiveLinkerT extends LinkerT{
      *  on the input budget and the Weighting Function
      * @return an RDD of IM
      */
-    def getDE9IM: Iterator[IM] = computeDE9IM( prioritize(Relation.DE9IM))
+    def getDE9IM: Iterator[IM] = computeDE9IM(prioritize(Relation.DE9IM))
 
 
     /**
@@ -83,4 +87,5 @@ trait ProgressiveLinkerT extends LinkerT{
 
     def prioritize(relation: Relation): ComparisonPQ
 
+    def buildClassifier: FeatureSet = ???
 }
