@@ -45,7 +45,6 @@ case class WeightedPairFactory(mainWF: WeightingFunction, secondaryWF: Option[We
                 val mw = getMainWeight(s, t)
                 val sw = getSecondaryWeight(s, t)
                 HybridWP(counter, sIndex, tIndex, mw, sw)
-
             case THIN_MULTI_COMPOSITE =>
                 val mw = jaccardSimilarity(s, t)
                 val sw = coOccurrenceFrequency(s, t)

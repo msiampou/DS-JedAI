@@ -112,14 +112,6 @@ sealed trait ConfigurationT {
             getSecondaryWF.foreach(swf => log.info(s"DS-JEDAI: Secondary Weighting Function: $swf"))
         }
     }
-
-//    // print configuration details regarding Supervised GIAnt
-//    def printSupervised(log: Logger): Unit = {
-//        print(log)
-//        log.info(s"DS-JEDAI: Algorithm: Supervised GIAnt")
-//        log.info(s"DS-JEDAI: Input Budget: $getBudget")
-//        log.info(s"DS-JEDAI: Number of Iterations: $getIterations")
-//    }
 }
 
 

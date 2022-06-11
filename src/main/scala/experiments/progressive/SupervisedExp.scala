@@ -107,12 +107,17 @@ object SupervisedExp {
     val linkers = DistributedProgressiveInterlinking.initializeProgressiveLinkers(sourceRDD, targetRDD,
       partitionBorders, theta, partitioner, progressiveAlg, budget, sourceCount, weightingScheme,
       mainWF, secondaryWF, batchSize, violations, precisionLimit)
+
     // invoke load of target
     targetRDD.count()
+    val expTime = DistributedProgressiveInterlinking.supervisedFiltering(linkers)
+    val preprocessingTime = expTime._1
+    val trainTime = expTime._2
+    val verificationTime = expTime._3
 
-    val PrStartTime = Calendar.getInstance().getTimeInMillis
-    val trainSets = DistributedProgressiveInterlinking.supervisedPreprocessing(linkers)
-    trainSets.count()
+    log.info(s"DS-JEDAI: Scheduling time: $preprocessingTime")
+    log.info(s"DS-JEDAI: Verification time: $trainTime")
+    log.info(s"DS-JEDAI: Interlinking Time: $verificationTime")
 
 //    // Experiments using MLib
 //    val flatRDD = trainSets.collect().flatten

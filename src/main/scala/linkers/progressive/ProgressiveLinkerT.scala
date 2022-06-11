@@ -87,5 +87,7 @@ trait ProgressiveLinkerT extends LinkerT{
 
     def prioritize(relation: Relation): ComparisonPQ
 
-    def buildClassifier: FeatureSet = ???
+    def preprocessing: ProgressiveLinkerT = ???
+
+    def buildClassifier: (Int, ProgressiveLinkerT) = ???
 }

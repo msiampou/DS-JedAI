@@ -295,8 +295,23 @@ object DistributedProgressiveInterlinking {
             totalOverlaps, totalTouches, totalWithin, verifications, qualifiedPairs)
     }
 
-    def supervisedPreprocessing(linkersRDD: RDD[ProgressiveLinkerT]): RDD[FeatureSet] = {
-        linkersRDD.map(linker => linker.buildClassifier)
+    def supervisedFiltering(linkersRDD: RDD[ProgressiveLinkerT]): (Double, Double, Double) = {
+        val preprocessingStart = Calendar.getInstance().getTimeInMillis
+        val preprocessingRDD = linkersRDD.map(linker => linker.preprocessing)
+        preprocessingRDD.count()
+        val preprocessingTime = (Calendar.getInstance().getTimeInMillis - preprocessingStart) / 1000.0
+
+        val trainStart = Calendar.getInstance().getTimeInMillis
+        val trainRDD = preprocessingRDD.map(linker => linker.buildClassifier)
+        trainRDD.count()
+        val trainTime = (Calendar.getInstance().getTimeInMillis - trainStart) / 1000.0
+
+        val verificationStart = Calendar.getInstance().getTimeInMillis
+        val verificationRDD = trainRDD.map(linker => linker._2.prioritize(Relation.DE9IM))
+        verificationRDD.count()
+        val verificationTime = (Calendar.getInstance().getTimeInMillis - verificationStart) / 1000.0
+
+        (preprocessingTime, trainTime, verificationTime)
     }
 
     def supervisedTrain(rowRDD: RDD[Row], spark: SparkSession): sql.DataFrame = {

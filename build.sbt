@@ -39,6 +39,15 @@ libraryDependencies += "org.typelevel" %% "cats-core" % "2.0.0-RC3"
 // https://mvnrepository.com/artifact/org.scalatest/scalatest
 libraryDependencies += "org.scalatest" %% "scalatest" % "3.2.7" % Test
 
+libraryDependencies += "org.apache.spark" %% "spark-core" % "2.0.1"
+
+libraryDependencies += "org.apache.spark" %% "spark-sql" % "2.0.1"
+
+libraryDependencies += "org.apache.spark" %% "spark-mllib-local" % "2.0.1"
+
+libraryDependencies += "com.github.fommil.netlib" % "all" % "1.1.2"
+
+libraryDependencies += "org.apache.spark" %% "spark-mllib" % "2.0.1"
 
 assemblyMergeStrategy in assembly := {
 	case PathList("META-INF", xs @ _*) => MergeStrategy.discard

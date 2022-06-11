@@ -46,7 +46,6 @@ case class SpatialIndex[T <: {def getEnvelopeInternal(): Envelope}](entities: Ar
         }
     }
 
-
     private def insert(c: (Int, Int), i: Int): Unit = {
         val (x, y) = c
         if (index.contains(x))

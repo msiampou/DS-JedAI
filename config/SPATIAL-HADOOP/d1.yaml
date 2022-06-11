@@ -1,10 +1,10 @@
 source: 
-  path: "hdfs:///Projects/DSJedAI/Resources/data/LINEARWATER.tsv"
+  path: "/home/msiampou/Documents/work/DS-JedAI/data/LINEARWATER_100K.tsv"
   realIdField: "2"
   geometryField: "0"
 
 target:
-  path: "hdfs:///Projects/DSJedAI/Resources/data/AREAWATER.tsv"  
+  path: "/home/msiampou/Documents/work/DS-JedAI/data/AREAWATER_100K.tsv"
   realIdField: "2"
   geometryField: "0"
 

@@ -2,13 +2,14 @@ package linkers.progressive
 
 import model._
 import model.entities.EntityT
-import model.structures.{ComparisonPQ}
+import model.structures.{ComparisonPQ, StaticComparisonPQ}
 import model.weightedPairs.SamplePairT
 import org.apache.spark.ml.linalg.Vectors
 import org.locationtech.jts.geom.Envelope
 import utils.configuration.Constants
 import utils.configuration.Constants.Relation.Relation
 import utils.configuration.Constants.WeightingFunction.WeightingFunction
+
 import scala.collection.mutable.ListBuffer
 
 case class Supervised (source: Array[EntityT],
@@ -25,14 +26,15 @@ case class Supervised (source: Array[EntityT],
 
   extends ProgressiveLinkerT {
 
-  val sourceLen = source.length
-  val maxCandidatePairs = 10 * sourceLen
+  val sourceLen: Int = source.length
+  val maxCandidatePairs: Int = 10 * sourceLen
 
-  val CLASS_SIZE = 100
-  val NUM_FEATURES = 16
-  val SAMPLE_SIZE = if (maxCandidatePairs < 5000) maxCandidatePairs else 5000
+  val CLASS_SIZE: Int = 100
+  val NUM_FEATURES: Int = 16
+  val SAMPLE_SIZE: Int = if (maxCandidatePairs < 5000) maxCandidatePairs else 5000
 
-  val featureSet : FeatureSet = FeatureSet( CLASS_SIZE, NUM_FEATURES, SAMPLE_SIZE, sourceLen, source, tileGranularities)
+  val featureSet: FeatureSet = FeatureSet( CLASS_SIZE, NUM_FEATURES, SAMPLE_SIZE, sourceLen, source, tileGranularities)
+  var trainSet: weka.core.Instances = _
 
   def getCandidates(t: EntityT, cleanup: Boolean = false): Set[Int] = {
     if (cleanup) featureSet.frequencyMap.clear()
@@ -45,9 +47,9 @@ case class Supervised (source: Array[EntityT],
     candidateMatches
   }
 
-  def preprocessing : Unit = {
+  override def preprocessing: Supervised = {
 
-    if (sourceLen < 1) return
+    if (sourceLen < 1) return this
 
     source.foreach(s => featureSet.updateSourceStats(s, tileGranularities))
 
@@ -70,42 +72,72 @@ case class Supervised (source: Array[EntityT],
         co_occurrences += featureSet.updateCandStats(cID)
         val c = source(cID)
         candidates += featureSet.updateIntersectionStats(c, t, cID)
-        if(pairIds.contains(pairID)) {
+        if (pairIds.contains(pairID)) {
           featureSet.addMatch(SamplePairT(cID, counter, c, t))
         }
-        pairID+=1
+        pairID += 1
       }
       featureSet.updateTargetStats(co_occurrences, candidateMatches.size, candidates)
-      counter+=1
+      counter += 1
       featureSet.frequencyMap.clear
     }
     featureSet.updateSourceStats()
+    this
   }
 
   def train(posCands: Seq[Set[Int]], negCands: Seq[Set[Int]], pPairs: ListBuffer[SamplePairT],
-            nPairs: ListBuffer[SamplePairT], sz: Int): Unit =
+            nPairs: ListBuffer[SamplePairT], sz: Int): weka.core.Instances =
     featureSet.train(posCands, negCands, pPairs, nPairs, sz)
 
-  override def buildClassifier: FeatureSet = {
+  override def buildClassifier: (Int, Supervised) = {
+    if (sourceLen < 1) return (0, this)
 
-    val dfRow = Array.fill[Double](NUM_FEATURES+1)(0.0)
-
-    if (sourceLen < 1) return this.featureSet
-
-    this.preprocessing
     val (excessVerifications, positivePairs, negativePairs) = featureSet.trainSampling
 
     val sz = if (positivePairs.size < negativePairs.size) positivePairs.size else negativePairs.size
-    if (sz < 1) return this.featureSet
+    if (sz < 1) return (0, this)
 
     val posCands: Seq[Set[Int]] = for (idx <- 0 until sz)
       yield getCandidates(positivePairs(idx).getTargetGeometry, true)
     val negCands: Seq[Set[Int]] = for (idx <- 0 until  sz)
       yield getCandidates(negativePairs(idx).getTargetGeometry, true)
 
-    train(posCands, negCands, positivePairs, negativePairs, sz)
-    this.featureSet
+    this.trainSet = train(posCands, negCands, positivePairs, negativePairs, sz)
+    (excessVerifications, this)
   }
 
-  override def prioritize(relation: Relation): ComparisonPQ = ???
+  override def prioritize(relation: Relation): ComparisonPQ = {
+    var posDecisions = 0
+    var totalDecisions = 0
+    val localBudget = math.ceil((budget*source.length.toDouble) / totalSourceEntities.toDouble).toLong
+    val pq: StaticComparisonPQ = StaticComparisonPQ(localBudget)
+
+    this.featureSet.frequencyMap.clear()
+
+    if (sourceLen < 1 || this.trainSet == null) return pq
+
+    targetAr.indices.foreach { idx =>
+      val t = targetAr(idx)
+      val candidateMatches = getCandidates(t)
+      var rPairs = 0
+      val dPairs = candidateMatches.size
+      var tPairs = 0
+      candidateMatches.foreach { cID =>
+        val candidateStats = this.featureSet.isValid(cID, t)
+        tPairs += candidateStats._1
+        rPairs += candidateStats._2
+      }
+      candidateMatches.foreach { cID =>
+        val lrProbs = featureSet.getProbability(this.trainSet, cID, t, idx, tPairs, dPairs, rPairs)
+        if (!lrProbs.isEmpty) {
+          totalDecisions += 1
+          if (lrProbs(0) < lrProbs(1)) {
+            posDecisions += 1
+            // val wp = weightedPairFactory.createWeightedPair(idx, source(cID), i, t, j)
+          }
+        }
+      }
+    }
+    pq
+  }
 }
