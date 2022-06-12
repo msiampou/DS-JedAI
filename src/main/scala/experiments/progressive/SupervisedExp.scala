@@ -14,13 +14,13 @@ import org.apache.spark.rdd.RDD
 import org.apache.spark.{SparkConf, SparkContext}
 import org.apache.spark.serializer.KryoSerializer
 import org.apache.spark.sql.SparkSession
-import org.apache.spark.sql.types.{StructField, StructType, DoubleType}
+import org.apache.spark.sql.types.{DoubleType, StructField, StructType}
 import org.apache.spark.storage.StorageLevel
 import org.locationtech.jts.geom.Geometry
 import utils.configuration.{ConfigurationParser, Constants}
 import utils.configuration.Constants.EntityTypeENUM.EntityTypeENUM
 import utils.configuration.Constants.GeometryApproximationENUM.GeometryApproximationENUM
-import utils.configuration.Constants.{GridType, ProgressiveAlgorithm, WeightingFunction}
+import utils.configuration.Constants.{GridType, ProgressiveAlgorithm, Relation, WeightingFunction}
 import utils.configuration.Constants.ProgressiveAlgorithm.ProgressiveAlgorithm
 import utils.configuration.Constants.WeightingFunction.WeightingFunction
 import utils.readers.{GridPartitioner, Reader}
@@ -107,18 +107,39 @@ object SupervisedExp {
     val linkers = DistributedProgressiveInterlinking.initializeProgressiveLinkers(sourceRDD, targetRDD,
       partitionBorders, theta, partitioner, progressiveAlg, budget, sourceCount, weightingScheme,
       mainWF, secondaryWF, batchSize, violations, precisionLimit)
+    if (timeExp) {
+      // invoke load of target
+      targetRDD.count()
+      val expTime = DistributedProgressiveInterlinking.supervisedTime(linkers)
+      val preprocessingTime = expTime._1
+      val trainTime = expTime._2
+      val verificationTime = expTime._3
 
-    // invoke load of target
-    targetRDD.count()
-    val expTime = DistributedProgressiveInterlinking.supervisedFiltering(linkers)
-    val preprocessingTime = expTime._1
-    val trainTime = expTime._2
-    val verificationTime = expTime._3
+      log.info(s"DS-JEDAI: Preprocessing time: $preprocessingTime")
+      log.info(s"DS-JEDAI: Train time: $trainTime")
+      log.info(s"DS-JEDAI: Verification Time: $verificationTime")
 
-    log.info(s"DS-JEDAI: Scheduling time: $preprocessingTime")
-    log.info(s"DS-JEDAI: Verification time: $trainTime")
-    log.info(s"DS-JEDAI: Interlinking Time: $verificationTime")
+    } else {
+      val trainRDD = DistributedProgressiveInterlinking.supervisedTrain(linkers)
+      val (totalContains, totalCoveredBy, totalCovers, totalCrosses, totalEquals, totalIntersects,
+      totalOverlaps, totalTouches, totalWithin, verifications, qp) = DistributedProgressiveInterlinking.countAllRelations(trainRDD)
 
+      val totalRelations = totalContains + totalCoveredBy + totalCovers + totalCrosses + totalEquals +
+                           totalIntersects + totalOverlaps + totalTouches + totalWithin
+      log.info("DS-JEDAI: Total Verifications: " + verifications)
+      log.info("DS-JEDAI: Qualifying Pairs : " + qp)
+
+      log.info("DS-JEDAI: CONTAINS: " + totalContains)
+      log.info("DS-JEDAI: COVERED BY: " + totalCoveredBy)
+      log.info("DS-JEDAI: COVERS: " + totalCovers)
+      log.info("DS-JEDAI: CROSSES: " + totalCrosses)
+      log.info("DS-JEDAI: EQUALS: " + totalEquals)
+      log.info("DS-JEDAI: INTERSECTS: " + totalIntersects)
+      log.info("DS-JEDAI: OVERLAPS: " + totalOverlaps)
+      log.info("DS-JEDAI: TOUCHES: " + totalTouches)
+      log.info("DS-JEDAI: WITHIN: " + totalWithin)
+      log.info("DS-JEDAI: Total Relations Discovered: " + totalRelations)
+    }
 //    // Experiments using MLib
 //    val flatRDD = trainSets.collect().flatten
 //    val rowRDD = spark.sparkContext.parallelize(flatRDD)

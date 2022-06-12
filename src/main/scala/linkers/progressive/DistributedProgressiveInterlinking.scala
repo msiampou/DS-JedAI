@@ -295,32 +295,38 @@ object DistributedProgressiveInterlinking {
             totalOverlaps, totalTouches, totalWithin, verifications, qualifiedPairs)
     }
 
-    def supervisedFiltering(linkersRDD: RDD[ProgressiveLinkerT]): (Double, Double, Double) = {
+    def supervisedTime(linkersRDD: RDD[ProgressiveLinkerT]): (Double, Double, Double) = {
         val preprocessingStart = Calendar.getInstance().getTimeInMillis
         val preprocessingRDD = linkersRDD.map(linker => linker.preprocessing)
         preprocessingRDD.count()
         val preprocessingTime = (Calendar.getInstance().getTimeInMillis - preprocessingStart) / 1000.0
 
         val trainStart = Calendar.getInstance().getTimeInMillis
-        val trainRDD = preprocessingRDD.map(linker => linker.buildClassifier)
+        val trainRDD = preprocessingRDD.map(linker => linker.buildClassifier._2)
         trainRDD.count()
         val trainTime = (Calendar.getInstance().getTimeInMillis - trainStart) / 1000.0
 
         val verificationStart = Calendar.getInstance().getTimeInMillis
-        val verificationRDD = trainRDD.map(linker => linker._2.prioritize(Relation.DE9IM))
+        val verificationRDD = trainRDD.map(linker => linker.prioritize(Relation.DE9IM))
         verificationRDD.count()
         val verificationTime = (Calendar.getInstance().getTimeInMillis - verificationStart) / 1000.0
 
         (preprocessingTime, trainTime, verificationTime)
     }
 
-    def supervisedTrain(rowRDD: RDD[Row], spark: SparkSession): sql.DataFrame = {
-        val dF = spark.createDataFrame(rowRDD, Constants.schema)
-
-        val assembler = new VectorAssembler().setInputCols(Constants.featureCols).setOutputCol("features")
-        val trainDF = assembler.transform(dF)
-
-        val model = new LogisticRegression().fit(trainDF)
-        model.transform(trainDF)
+    def supervisedTrain(linkersRDD: RDD[ProgressiveLinkerT]): RDD[ProgressiveLinkerT] = {
+        val preprocessingRDD = linkersRDD.map(linker => linker.preprocessing)
+        val trainRDD = preprocessingRDD.map(linker => linker.buildClassifier._2)
+        trainRDD
     }
+
+//    def supervisedTrain(rowRDD: RDD[Row], spark: SparkSession): sql.DataFrame = {
+//        val dF = spark.createDataFrame(rowRDD, Constants.schema)
+//
+//        val assembler = new VectorAssembler().setInputCols(Constants.featureCols).setOutputCol("features")
+//        val trainDF = assembler.transform(dF)
+//
+//        val model = new LogisticRegression().fit(trainDF)
+//        model.transform(trainDF)
+//    }
 }

@@ -116,6 +116,7 @@ case class Supervised (source: Array[EntityT],
 
     if (sourceLen < 1 || this.trainSet == null) return pq
 
+    var counter = 0
     targetAr.indices.foreach { idx =>
       val t = targetAr(idx)
       val candidateMatches = getCandidates(t)
@@ -133,7 +134,11 @@ case class Supervised (source: Array[EntityT],
           totalDecisions += 1
           if (lrProbs(0) < lrProbs(1)) {
             posDecisions += 1
-            // val wp = weightedPairFactory.createWeightedPair(idx, source(cID), i, t, j)
+            val c = source(cID)
+            val w = lrProbs(1).toFloat
+            val wp = weightedPairFactory.createWeightedPair(counter, c, cID, t, idx, w)
+            pq.enqueue(wp)
+            counter += 1
           }
         }
       }

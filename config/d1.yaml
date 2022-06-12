@@ -17,3 +17,4 @@ configurations:
   partitions: "400"
   num_iterations: "5"
   budget: "10000"
+  stats: true

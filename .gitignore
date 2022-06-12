@@ -26,7 +26,8 @@ project/plugins/project/
 /config/LINEARWATER-AREAWATER.yaml
 /config/OSI.yaml
 /config/ROADS_EDGES.yaml
-config/SPATIAL-HADOOP/d1.yaml
+/config/SPATIAL-HADOOP/d1.yaml
+/config/d1.yaml
 
 /data/
 run.sh

@@ -1,19 +1,16 @@
 package linkers.progressive
 
 import linkers.LinkerT
-import model.{FeatureSet, IM}
+import model.{IM}
 import model.entities.EntityT
 import model.structures.{ComparisonPQ, SpatialIndex}
-import model.weightedPairs.{SamplePairT, WeightedPairFactory}
+import model.weightedPairs.{WeightedPairFactory}
 import org.locationtech.jts.geom.Envelope
 import utils.configuration.Constants
 import utils.configuration.Constants.Relation
 import utils.configuration.Constants.Relation.Relation
 import utils.configuration.Constants.WeightingFunction.WeightingFunction
 import org.apache.spark.ml.linalg.Vectors
-import org.apache.spark.rdd.RDD
-import org.apache.spark.sql
-import org.apache.spark.sql.{Row, SparkSession}
 
 trait ProgressiveLinkerT extends LinkerT{
     val budget: Int

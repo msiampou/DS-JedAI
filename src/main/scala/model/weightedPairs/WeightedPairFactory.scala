@@ -32,10 +32,13 @@ case class WeightedPairFactory(mainWF: WeightingFunction, secondaryWF: Option[We
         case None => 0f
     }
 
-    def createWeightedPair(counter: Int, s: EntityT, sIndex: Int, t:EntityT, tIndex: Int): WeightedPairT = {
+    def createWeightedPair(counter: Int, s: EntityT, sIndex: Int, t:EntityT, tIndex: Int, prob: Float = 0f): WeightedPairT = {
         weightingScheme match {
             case SIMPLE =>
-                val mw = getMainWeight(s, t)
+                val mw = WeightingFunction match {
+                    case WeightingFunction.LR => prob
+                    case _ => getMainWeight(s, t)
+                }
                 SimpleWP(counter, sIndex, tIndex, mw)
             case COMPOSITE =>
                 val mw = getMainWeight(s, t)
