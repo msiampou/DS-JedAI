@@ -1,10 +1,10 @@
 source: 
-  path: "/home/msiampou/Documents/work/DS-JedAI/data/LINEARWATER_100K.tsv"
+  path: "hdfs:///user/gman/ds-jedai/LINEARWATER.tsv"
   realIdField: "2"
   geometryField: "0"
 
 target:
-  path: "/home/msiampou/Documents/work/DS-JedAI/data/AREAWATER_100K.tsv"
+  path: "hdfs:///user/gman/ds-jedai/AREAWATER.tsv"
   realIdField: "2"
   geometryField: "0"
 
@@ -13,7 +13,7 @@ relation: "DE9IM"
 configurations:
   thetaGranularity: "avg"
   gridType: "QUADTREE"
-  partitions: "400"
+  partitions: "800"
   progressiveAlgorithm: "SUPERVISED"
   num_iterations: "5"
   budget: "3155320"

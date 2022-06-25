@@ -6,7 +6,6 @@ import model.weightedPairs.{SamplePairT, VerifiedPair}
 import org.apache.spark.ml.linalg.Vectors
 import utils.configuration.Constants.{CommonTiles, IntersectionArea, Label, SourceArea, SourceBoundPoints, SourceDistCooccurrences, SourceLen, SourceRealCooccurrences, SourceTiles, SourceTotalCooccurrences, TargetArea, TargetBoundPoints, TargetDistCooccurrences, TargetLen, TargetRealCooccurrences, TargetTiles, TargetTotalCooccurrences}
 
-import scala.collection.mutable.HashSet
 import scala.collection.mutable.ListBuffer
 
 case class FeatureSet (class_size: Int,
@@ -118,7 +117,23 @@ case class FeatureSet (class_size: Int,
     retVal
   }
 
-  def getFeatures(s: EntityT, t: EntityT, sID: Int, total: Int, distinct: Int, real: Int, arraySize: Int): Array[Double] = {
+  def getCandStats(t: EntityT, candSet: Set[Int]): (Int, Int, Int) = {
+    var co_occurrences = 0
+    var d_co_occurrences = 0
+    var t_co_occurrences = 0
+    candSet.foreach { cID =>
+      val c = source(cID)
+      co_occurrences += frequencyMap.get(cID)
+      d_co_occurrences += 1
+      val intersects = c.getEnvelopeInternal.intersects(t.getEnvelopeInternal)
+      if (intersects) t_co_occurrences += 1
+    }
+    (co_occurrences, d_co_occurrences, t_co_occurrences)
+  }
+
+  def getFeatures(s: EntityT, t: EntityT, sID: Int, total: Int, distinct: Int, real: Int,
+                  arraySize: Int): Array[Double] = {
+
     val dfRow = Array.fill[Double](arraySize)(0.0)
 
     val interMBR = s.getEnvelopeInternal.intersection(t.getEnvelopeInternal)
@@ -154,29 +169,18 @@ case class FeatureSet (class_size: Int,
     getFeatures(s, t, sID, tPairs, dPairs, rPairs, NO_OF_FEATURES+1)
   }
 
-  def computeRowVector(label: Int, p: SamplePairT, candSet: Set[Int]) : Array[Double] = {
+  def computeRowVector(label: Int, p: SamplePairT, candSet: (Int, Int, Int)) : Array[Double] = {
     val sID = p.getSourceId
     val s = p.getSourceGeometry
     val t = p.getTargetGeometry
-
-    var co_occurrences = 0
-    var d_co_occurrences = 0
-    var t_co_occurrences = 0
-    candSet.foreach { cID =>
-      val c = source(cID)
-      co_occurrences += frequencyMap.get(cID)
-      d_co_occurrences += 1
-      val intersects = c.getEnvelopeInternal.intersects(t.getEnvelopeInternal)
-      if (intersects) t_co_occurrences += 1
-    }
-
+    val (co_occurrences, d_co_occurrences, t_co_occurrences) = candSet
     val dfRow = getFeatures(s, t, sID, co_occurrences, d_co_occurrences, t_co_occurrences, NO_OF_FEATURES+1)
     dfRow(Label.value) = label.toDouble
     dfRow
   }
 
   def build(trainClass: Int, trainPairs: scala.collection.mutable.ListBuffer[SamplePairT],
-            candidates: Seq[Set[Int]], sz: Int): Seq[Array[Double]] =  {
+            candidates: Seq[(Int, Int, Int)], sz: Int): Seq[Array[Double]] =  {
     for (idx <- 0 until  sz) yield computeRowVector(trainClass, trainPairs(idx), candidates(idx))
   }
 
@@ -224,7 +228,7 @@ case class FeatureSet (class_size: Int,
     instance
   }
 
-  def train(posCands: Seq[Set[Int]], negCands: Seq[Set[Int]], pPairs: ListBuffer[SamplePairT],
+  def train(posCands: Seq[(Int, Int, Int)], negCands: Seq[(Int, Int, Int)], pPairs: ListBuffer[SamplePairT],
             nPairs: ListBuffer[SamplePairT], sz: Int): weka.core.Instances = {
     val posInstances = build(POSITIVE_PAIR, pPairs, posCands, sz)
     val negInstances = build(NEGATIVE_PAIR, nPairs, negCands, sz)
@@ -246,11 +250,12 @@ case class FeatureSet (class_size: Int,
     val s = source(sID)
     val freq = this.frequencyMap.get(sID)
     val intersects = s.getEnvelopeInternal.intersects(t.getEnvelopeInternal)
-    val isValid = if (intersects) 1 else 2
+    val isValid = if (intersects) 1 else 0
     (freq, isValid)
   }
 
-  def getProbability(trainSet: weka.core.Instances, candidateID: Int, t: EntityT, tID: Int, tPairs: Int, dPairs: Int, rPairs: Int): Array[Double] = {
+  def getProbability(trainSet: weka.core.Instances, candidateID: Int, t: EntityT, tID: Int, tPairs: Int,
+                     dPairs: Int, rPairs: Int): Array[Double] = {
     val c = source(candidateID)
     val intersects = c.getEnvelopeInternal.intersects(t.getEnvelopeInternal)
     val emptyArray: Array[Double] = Array[Double]()

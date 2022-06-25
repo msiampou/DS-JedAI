@@ -8,7 +8,7 @@ case class CandidateSet() {
     val value = _map.get(key)
     value match {
       case None =>
-        add(key, 1)
+        add(key, a)
       case Some(x) =>
         _map += (key -> (x+a))
     }

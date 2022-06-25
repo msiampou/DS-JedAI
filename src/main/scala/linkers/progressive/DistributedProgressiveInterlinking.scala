@@ -196,7 +196,7 @@ object DistributedProgressiveInterlinking {
     def progressiveEvaluate(progressiveLinkersRDD: RDD[ProgressiveLinkerT], relation: Relation, n: Int = 10,
                  totalQualifiedPairs: Long, takeBudget: Seq[Int]
                          ): Seq[(Double, Int, Int, (List[Int], List[Int]))]={
-        // computes weighted the weighted comparisons
+        // computes the weighted comparisons
         val matches: RDD[Boolean] = progressiveLinkersRDD.flatMap { linker => linker.computeDE9IM(linker.prioritize(relation)).map(_.relate) }
         val sortedPairs = matches.takeOrdered(takeBudget.max)
         evaluatePairs(sortedPairs, takeBudget, n, totalQualifiedPairs)
@@ -319,14 +319,4 @@ object DistributedProgressiveInterlinking {
         val trainRDD = preprocessingRDD.map(linker => linker.buildClassifier._2)
         trainRDD
     }
-
-//    def supervisedTrain(rowRDD: RDD[Row], spark: SparkSession): sql.DataFrame = {
-//        val dF = spark.createDataFrame(rowRDD, Constants.schema)
-//
-//        val assembler = new VectorAssembler().setInputCols(Constants.featureCols).setOutputCol("features")
-//        val trainDF = assembler.transform(dF)
-//
-//        val model = new LogisticRegression().fit(trainDF)
-//        model.transform(trainDF)
-//    }
 }

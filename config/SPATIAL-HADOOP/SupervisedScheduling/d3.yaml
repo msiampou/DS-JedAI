@@ -1,0 +1,19 @@
+source: 
+  path: "hdfs:///user/gman/ds-jedai/parks.tsv"
+  realIdField: "0"
+  geometryField: "1"
+
+target:
+  path: "hdfs:///user/gman/ds-jedai/lakes.tsv"
+  realIdField: "0"
+  geometryField: "1"
+
+relation: "DE9IM"
+
+configurations:
+  thetaGranularity: "avg"
+  gridType: "QUADTREE"
+  partitions: "500"
+  progressiveAlgorithm: "SUPERVISED"
+  num_iterations: "5"
+  decompositionThreshold: "100"

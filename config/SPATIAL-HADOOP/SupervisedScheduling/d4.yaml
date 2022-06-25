@@ -1,0 +1,19 @@
+source: 
+  path: "hdfs:///user/gman/ds-jedai/roads.tsv"
+  realIdField: "0"
+  geometryField: "1"
+
+target:
+  path: "hdfs:///user/gman/ds-jedai/parks.tsv"
+  realIdField: "0"
+  geometryField: "1"
+
+relation: "DE9IM"
+
+configurations:
+  thetaGranularity: "avg"
+  gridType: "QUADTREE"
+  progressiveAlgorithm: "SUPERVISED"
+  num_iterations: "5"
+  partitions: "1000"
+
