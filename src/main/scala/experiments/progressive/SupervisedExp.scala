@@ -28,7 +28,7 @@ object SupervisedExp {
   log.setLevel(Level.INFO)
 
   val defaultBudget: Int = 3000
-  val takeBudget: Seq[Int] = Seq(3155320)
+  var takeBudget: Seq[Int] = _
   val relation: Relation = Relation.DE9IM
 
   def main(args: Array[String]): Unit = {
@@ -59,6 +59,7 @@ object SupervisedExp {
     val inputBudget: Int = conf.getBudget
     val progressiveAlg: ProgressiveAlgorithm = conf.getProgressiveAlgorithm
     val budget = if (inputBudget > 0) inputBudget else defaultBudget
+    this.takeBudget = Seq(budget)
     val entityTypeType: EntityTypeENUM = conf.getEntityType
 
     val weightingScheme: Constants.WeightingScheme =
@@ -112,37 +113,25 @@ object SupervisedExp {
 
     } else {
       // to compute recall and precision we need overall results
-      val (totalVerifications, totalRelatedPairs) =
-        (conf.getTotalVerifications, conf.getTotalQualifyingPairs) match {
-          case (Some(tv), Some(qp)) =>
-            (tv, qp)
-          case _ =>
-            val g = DistributedInterlinking.countAllRelations(
-              DistributedInterlinking.initializeLinkers(sourceRDD, targetRDD, partitionBorder, theta, partitioner))
-            (g._10, g._11)
-        }
+//      val (totalVerifications, totalRelatedPairs) =
+//        (conf.getTotalVerifications, conf.getTotalQualifyingPairs) match {
+//          case (Some(tv), Some(qp)) =>
+//            (tv, qp)
+//          case _ =>
+//            val g = DistributedInterlinking.countAllRelations(
+//              DistributedInterlinking.initializeLinkers(sourceRDD, targetRDD, partitionBorder, theta, partitioner))
+//            (g._10, g._11)
+//        }
+//
+//      log.info("DS-JEDAI: Total Verifications: " + totalVerifications)
+//      log.info("DS-JEDAI: Qualifying Pairs : " + totalRelatedPairs)
+//      log.info("\n")
 
-      log.info("DS-JEDAI: Total Verifications: " + totalVerifications)
-      log.info("DS-JEDAI: Qualifying Pairs : " + totalRelatedPairs)
-      log.info("\n")
+      val totalRelatedPairs = 199122
 
       val wf: (WeightingFunction, Option[WeightingFunction]) = (mainWF, secondaryWF)
       printEvaluationResults(sourceRDD, targetRDD, theta, partitionBorder, approximateSourceCount,
         partitioner, totalRelatedPairs, budget, progressiveAlg, wf, weightingScheme)
-
-      //    // Experiments using MLib
-      //    val flatRDD = trainSets.collect().flatten
-      //    val rowRDD = spark.sparkContext.parallelize(flatRDD)
-      //    val PrEndTime = Calendar.getInstance().getTimeInMillis
-      //    log.info("DS-JEDAI: Preprocessing Time: " + (PrEndTime - PrStartTime) / 1000.0)
-      //
-      //    log.info(s"DS-JEDAI: Starting Supervised Train..")
-      //    val TrainStartTime = Calendar.getInstance().getTimeInMillis
-      //    val predictions = DistributedProgressiveInterlinking.supervisedTrain(rowRDD, spark)
-      //    log.info(trainSets.count() + "," + rowRDD.count())
-      //    val TrainEndTime = Calendar.getInstance().getTimeInMillis
-      //    log.info("DS-JEDAI: Training Time: " + (TrainEndTime - TrainStartTime) / 1000.0)
-
     }
   }
   def printEvaluationResults(sRDD: RDD[(Int, EntityT)], tRDD: RDD[(Int, EntityT)],

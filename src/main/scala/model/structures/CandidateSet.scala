@@ -4,13 +4,13 @@ package model.structures
 case class CandidateSet() {
   private var _map = Map[Int, Int]()
 
-  def increment(key: Int, a: Int): Unit = {
+  def increment(key: Int, a: Int = 1): Unit = {
     val value = _map.get(key)
     value match {
       case None =>
         add(key, a)
       case Some(x) =>
-        _map += (key -> (x+a))
+        add(key, x+a)
     }
   }
 
@@ -28,5 +28,6 @@ case class CandidateSet() {
 
   def add(key: Int, value: Int): Unit = _map += (key -> value)
 
-  def add(key: Int): Unit = _map += (key -> 0)
+  def remove(key: Int): Unit = _map -= key
+
 }

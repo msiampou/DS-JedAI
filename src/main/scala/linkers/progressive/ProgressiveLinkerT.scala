@@ -86,5 +86,5 @@ trait ProgressiveLinkerT extends LinkerT{
 
     def preprocessing: ProgressiveLinkerT = ???
 
-    def buildClassifier: (Int, ProgressiveLinkerT) = ???
+    def buildClassifier: ProgressiveLinkerT = ???
 }

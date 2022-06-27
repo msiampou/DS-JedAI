@@ -302,7 +302,7 @@ object DistributedProgressiveInterlinking {
         val preprocessingTime = (Calendar.getInstance().getTimeInMillis - preprocessingStart) / 1000.0
 
         val trainStart = Calendar.getInstance().getTimeInMillis
-        val trainRDD = preprocessingRDD.map(linker => linker.buildClassifier._2)
+        val trainRDD = preprocessingRDD.map(linker => linker.buildClassifier)
         trainRDD.count()
         val trainTime = (Calendar.getInstance().getTimeInMillis - trainStart) / 1000.0
 
@@ -316,7 +316,7 @@ object DistributedProgressiveInterlinking {
 
     def supervisedTrain(linkersRDD: RDD[ProgressiveLinkerT]): RDD[ProgressiveLinkerT] = {
         val preprocessingRDD = linkersRDD.map(linker => linker.preprocessing)
-        val trainRDD = preprocessingRDD.map(linker => linker.buildClassifier._2)
+        val trainRDD = preprocessingRDD.map(linker => linker.buildClassifier)
         trainRDD
     }
 }

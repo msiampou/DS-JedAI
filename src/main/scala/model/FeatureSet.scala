@@ -38,7 +38,7 @@ case class FeatureSet (class_size: Int,
   val sample: scala.collection.mutable.ListBuffer[SamplePairT] = scala.collection.mutable.ListBuffer[SamplePairT]()
   val vPairs: scala.collection.mutable.HashSet[VerifiedPair] = scala.collection.mutable.HashSet[VerifiedPair]()
 
-  var frequencyMap: CandidateSet = CandidateSet()
+  var freqArray: scala.collection.mutable.ListBuffer[CandidateSet] = scala.collection.mutable.ListBuffer[CandidateSet]()
   var distinctCooccurrences: CandidateSet = CandidateSet()
   var totalCooccurrences: CandidateSet = CandidateSet()
   var realCandidates: CandidateSet = CandidateSet()
@@ -98,32 +98,33 @@ case class FeatureSet (class_size: Int,
     update(TargetRealCooccurrences.value, n_candidates)
   }
 
-  def updateCandStats(cID: Int): Int = {
-    distinctCooccurrences.increment(cID, 1)
-    totalCooccurrences.increment(cID, frequencyMap.get(cID))
-    frequencyMap.get(cID)
+  def updateCandStats(cID: Int, idx: Int): Int = {
+    val freq = freqArray(idx).get(cID)
+    distinctCooccurrences.increment(cID)
+    totalCooccurrences.increment(cID, freq)
+    freq
   }
 
-  def updateIntersectionStats(s: EntityT, t: EntityT, cID: Int): Int = {
+  def updateIntersectionStats(s: EntityT, t: EntityT, cID: Int, idx: Int): Boolean = {
     val intersect = s.getEnvelopeInternal.intersects(t.getEnvelopeInternal)
-    var retVal = 0
+    var retVal = false
     if (intersect) {
-      realCandidates.increment(cID, 1)
+      realCandidates.increment(cID)
       val interMBR = s.getEnvelopeInternal.intersection(t.getEnvelopeInternal).getArea
       update(IntersectionArea.value, interMBR)
-      update(CommonTiles.value, frequencyMap.get(cID))
-      retVal = 1
+      update(CommonTiles.value, freqArray(idx).get(cID))
+      retVal = true
     }
     retVal
   }
 
-  def getCandStats(t: EntityT, candSet: Set[Int]): (Int, Int, Int) = {
+  def getCandStats(t: EntityT, candSet: Set[Int], idx: Int): (Int, Int, Int) = {
     var co_occurrences = 0
     var d_co_occurrences = 0
     var t_co_occurrences = 0
     candSet.foreach { cID =>
       val c = source(cID)
-      co_occurrences += frequencyMap.get(cID)
+      co_occurrences += freqArray(idx).get(cID)
       d_co_occurrences += 1
       val intersects = c.getEnvelopeInternal.intersects(t.getEnvelopeInternal)
       if (intersects) t_co_occurrences += 1
@@ -131,7 +132,7 @@ case class FeatureSet (class_size: Int,
     (co_occurrences, d_co_occurrences, t_co_occurrences)
   }
 
-  def getFeatures(s: EntityT, t: EntityT, sID: Int, total: Int, distinct: Int, real: Int,
+  def getFeatures(s: EntityT, t: EntityT, sID: Int, tID: Int, total: Int, distinct: Int, real: Int,
                   arraySize: Int): Array[Double] = {
 
     val dfRow = Array.fill[Double](arraySize)(0.0)
@@ -145,7 +146,7 @@ case class FeatureSet (class_size: Int,
     //grid-based features
     dfRow(SourceTiles.value) = (s.getNumOfOverlappingTiles(THETA) - minFeatures(3)) / maxFeatures(3) * 10000
     dfRow(TargetTiles.value) = (t.getNumOfOverlappingTiles(THETA) - minFeatures(4)) / maxFeatures(4) * 10000
-    dfRow(CommonTiles.value) = (frequencyMap.get(sID) - minFeatures(5)) / maxFeatures(5) * 10000
+    dfRow(CommonTiles.value) = (freqArray(tID).get(sID) - minFeatures(5)) / maxFeatures(5) * 10000
 
     //boundary-based features
     dfRow(SourceBoundPoints.value) = (s.getNumPoints - minFeatures(6)) / maxFeatures(6) * 10000
@@ -165,16 +166,17 @@ case class FeatureSet (class_size: Int,
     dfRow
   }
 
-  def computeRowVector(s: EntityT, t: EntityT, sID: Int, tPairs: Int, dPairs: Int, rPairs: Int): Array[Double] = {
-    getFeatures(s, t, sID, tPairs, dPairs, rPairs, NO_OF_FEATURES+1)
+  def computeRowVector(s: EntityT, t: EntityT, sID: Int, tID: Int, tPairs: Int, dPairs: Int, rPairs: Int): Array[Double] = {
+    getFeatures(s, t, sID, tID, tPairs, dPairs, rPairs, NO_OF_FEATURES+1)
   }
 
   def computeRowVector(label: Int, p: SamplePairT, candSet: (Int, Int, Int)) : Array[Double] = {
     val sID = p.getSourceId
+    val tID = p.getTargetId
     val s = p.getSourceGeometry
     val t = p.getTargetGeometry
     val (co_occurrences, d_co_occurrences, t_co_occurrences) = candSet
-    val dfRow = getFeatures(s, t, sID, co_occurrences, d_co_occurrences, t_co_occurrences, NO_OF_FEATURES+1)
+    val dfRow = getFeatures(s, t, sID, tID, co_occurrences, d_co_occurrences, t_co_occurrences, NO_OF_FEATURES+1)
     dfRow(Label.value) = label.toDouble
     dfRow
   }
@@ -184,16 +186,12 @@ case class FeatureSet (class_size: Int,
     for (idx <- 0 until  sz) yield computeRowVector(trainClass, trainPairs(idx), candidates(idx))
   }
 
-  def trainSampling : (Int, ListBuffer[SamplePairT], ListBuffer[SamplePairT]) = {
-    var excessVerifications = 0
-    var negativeClassFull = false
-    var positiveClassFull = false
+  def trainSampling : (ListBuffer[SamplePairT], ListBuffer[SamplePairT]) = {
     val negativePairs = scala.collection.mutable.ListBuffer[SamplePairT]()
     val positivePairs = scala.collection.mutable.ListBuffer[SamplePairT]()
-    scala.util.Random.shuffle(sample)
 
     var idx = 0
-    while (sample.size > 0 && idx < sample.size && !negativeClassFull && !positiveClassFull) {
+    while (sample.size > 0 && idx < sample.size) {
       val pair = sample(idx)
       val s = pair.getSourceGeometry
       val t = pair.getTargetGeometry
@@ -203,23 +201,13 @@ case class FeatureSet (class_size: Int,
       val vPair = VerifiedPair(pair.getSourceId, pair.getTargetId)
       vPairs += vPair
       if (im.relate) {
-        if (positivePairs.size < CLASS_SIZE) {
-          positivePairs += pair
-        } else {
-          excessVerifications += 1
-          positiveClassFull = true
-        }
+        if (positivePairs.size < CLASS_SIZE) positivePairs += pair
       } else {
-        if (negativePairs.size < CLASS_SIZE) {
-          negativePairs += pair
-        } else {
-          excessVerifications += 1
-          negativeClassFull = true
-        }
+        if (negativePairs.size < CLASS_SIZE) negativePairs += pair
       }
       idx += 1
     }
-    (excessVerifications, positivePairs, negativePairs)
+    (positivePairs, negativePairs)
   }
 
   def setInstance(featureVector: Array[Double], trainSet: weka.core.Instances, weight: Double): weka.core.Instance = {
@@ -246,9 +234,9 @@ case class FeatureSet (class_size: Int,
     trainSet
   }
 
-  def isValid(sID: Int, t: EntityT): (Int, Int) = {
+  def isValid(sID: Int, t: EntityT, tID: Int): (Int, Int) = {
     val s = source(sID)
-    val freq = this.frequencyMap.get(sID)
+    val freq = this.freqArray(tID).get(sID)
     val intersects = s.getEnvelopeInternal.intersects(t.getEnvelopeInternal)
     val isValid = if (intersects) 1 else 0
     (freq, isValid)
@@ -265,7 +253,7 @@ case class FeatureSet (class_size: Int,
     val vPair = VerifiedPair(candidateID, tID)
     if (this.vPairs.contains(vPair)) return emptyArray
 
-    val features = computeRowVector(c, t, candidateID, tPairs, dPairs, rPairs)
+    val features = computeRowVector(c, t, candidateID, tID, tPairs, dPairs, rPairs)
     val instance = setInstance(features, trainSet, 1.0)
     val prob: Array[Double] = this.clf.distributionForInstance(instance)
     prob

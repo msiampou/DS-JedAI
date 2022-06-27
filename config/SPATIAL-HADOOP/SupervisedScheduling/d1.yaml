@@ -16,6 +16,5 @@ configurations:
   partitions: "800"
   progressiveAlgorithm: "SUPERVISED"
   num_iterations: "5"
-  budget: "3155320"
 
 
