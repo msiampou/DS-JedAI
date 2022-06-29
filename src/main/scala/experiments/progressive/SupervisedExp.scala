@@ -113,21 +113,20 @@ object SupervisedExp {
 
     } else {
       // to compute recall and precision we need overall results
-//      val (totalVerifications, totalRelatedPairs) =
-//        (conf.getTotalVerifications, conf.getTotalQualifyingPairs) match {
-//          case (Some(tv), Some(qp)) =>
-//            (tv, qp)
-//          case _ =>
-//            val g = DistributedInterlinking.countAllRelations(
-//              DistributedInterlinking.initializeLinkers(sourceRDD, targetRDD, partitionBorder, theta, partitioner))
-//            (g._10, g._11)
-//        }
-//
-//      log.info("DS-JEDAI: Total Verifications: " + totalVerifications)
-//      log.info("DS-JEDAI: Qualifying Pairs : " + totalRelatedPairs)
-//      log.info("\n")
+      val (totalVerifications, totalRelatedPairs) =
+        (conf.getTotalVerifications, conf.getTotalQualifyingPairs) match {
+          case (Some(tv), Some(qp)) =>
+            (tv, qp)
+          case _ =>
+            val g = DistributedInterlinking.countAllRelations(
+              DistributedInterlinking.initializeLinkers(sourceRDD, targetRDD, partitionBorder, theta, partitioner))
+            (g._10, g._11)
+        }
 
-      val totalRelatedPairs = 199122
+      log.info("DS-JEDAI: Total Verifications: " + totalVerifications)
+      log.info("DS-JEDAI: Qualifying Pairs : " + totalRelatedPairs)
+      log.info("\n")
+      // val totalRelatedPairs = 2401389
 
       val wf: (WeightingFunction, Option[WeightingFunction]) = (mainWF, secondaryWF)
       printEvaluationResults(sourceRDD, targetRDD, theta, partitionBorder, approximateSourceCount,
@@ -144,9 +143,12 @@ object SupervisedExp {
     val linkers = DistributedProgressiveInterlinking.initializeProgressiveLinkers(sRDD, tRDD,
       partitionBorders, theta, partitioner, algorithm, budget, sourceCount, ws, wf._1, wf._2)
 
-    val trainRDD = DistributedProgressiveInterlinking.supervisedTrain(linkers)
-    val evaluation = DistributedProgressiveInterlinking.evaluate(algorithm, trainRDD, relation, n, totalRelations, takeBudget)
 
+    val trainRDD = DistributedProgressiveInterlinking.supervisedTrain(linkers)
+    trainRDD.count()
+    log.info(s"DS-JEDAI: Train-End")
+    val evaluation = DistributedProgressiveInterlinking.evaluate(algorithm, trainRDD, relation, n, totalRelations, takeBudget)
+    log.info(s"DS-JEDAI: Evaluating")
     evaluation.zip(takeBudget).foreach { case ((pgr, qp, verifications, (_, _)), b) =>
       val qualifiedPairsWithinBudget = if (totalRelations < verifications) totalRelations else verifications
       log.info(s"DS-JEDAI: ${algorithm.toString} Budget : $b")

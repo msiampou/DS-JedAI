@@ -13,7 +13,8 @@ case class FeatureSet (class_size: Int,
                        sample_size: Int,
                        datasetDel: Int,
                        sourceAr: Array[EntityT],
-                       tileGranularities: TileGranularities
+                       tileGranularities: TileGranularities,
+                       targetLen: Int
                       ) {
 
   val CLASS_SIZE: Int = class_size
@@ -38,7 +39,9 @@ case class FeatureSet (class_size: Int,
   val sample: scala.collection.mutable.ListBuffer[SamplePairT] = scala.collection.mutable.ListBuffer[SamplePairT]()
   val vPairs: scala.collection.mutable.HashSet[VerifiedPair] = scala.collection.mutable.HashSet[VerifiedPair]()
 
-  var freqArray: scala.collection.mutable.ListBuffer[CandidateSet] = scala.collection.mutable.ListBuffer[CandidateSet]()
+  val freqArray: scala.collection.mutable.ListBuffer[CandidateSet] = scala.collection.mutable.ListBuffer[CandidateSet]()
+//  var flags = Array.fill[Int](datasetDelimiter)(0)
+//  var frequency = Array.fill[Int](datasetDelimiter)(0)
   var distinctCooccurrences: CandidateSet = CandidateSet()
   var totalCooccurrences: CandidateSet = CandidateSet()
   var realCandidates: CandidateSet = CandidateSet()
@@ -118,7 +121,7 @@ case class FeatureSet (class_size: Int,
     retVal
   }
 
-  def getCandStats(t: EntityT, candSet: Set[Int], idx: Int): (Int, Int, Int) = {
+  def getcandidateStatistics(t: EntityT, candSet: Set[Int], idx: Int): (Int, Int, Int) = {
     var co_occurrences = 0
     var d_co_occurrences = 0
     var t_co_occurrences = 0
@@ -236,7 +239,7 @@ case class FeatureSet (class_size: Int,
 
   def isValid(sID: Int, t: EntityT, tID: Int): (Int, Int) = {
     val s = source(sID)
-    val freq = this.freqArray(tID).get(sID)
+    val freq = freqArray(tID).get(sID)
     val intersects = s.getEnvelopeInternal.intersects(t.getEnvelopeInternal)
     val isValid = if (intersects) 1 else 0
     (freq, isValid)

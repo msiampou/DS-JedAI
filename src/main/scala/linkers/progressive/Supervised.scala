@@ -11,6 +11,7 @@ import utils.configuration.Constants.Relation.Relation
 import utils.configuration.Constants.WeightingFunction.WeightingFunction
 
 import scala.collection.mutable.ListBuffer
+import scala.language.postfixOps
 
 case class Supervised (source: Array[EntityT],
                        target: Iterable[EntityT],
@@ -27,136 +28,168 @@ case class Supervised (source: Array[EntityT],
   extends ProgressiveLinkerT {
 
   val sourceLen: Int = source.length
-  val targetLen: Int = target.size
-  val maxCandidatePairs: Int = 10 * sourceLen
+  val targetLen: Int = targetAr.size
+  val maxCandidatePairs: Int = 50*sourceLen
 
   val NUM_FEATURES: Int = 16
-  val SAMPLE_SIZE: Int = (0.8*(sourceLen + targetLen)).toInt
+  val SAMPLE_SIZE: Int = (0.6*(sourceLen+targetLen)).toInt
   val CLASS_SIZE: Int = SAMPLE_SIZE/2
 
-  val featureSet: FeatureSet = FeatureSet(CLASS_SIZE, NUM_FEATURES, SAMPLE_SIZE, sourceLen, source, tileGranularities)
+  val featureSet: FeatureSet = FeatureSet(CLASS_SIZE, NUM_FEATURES, SAMPLE_SIZE, sourceLen, source, tileGranularities, targetLen)
   var trainSet: weka.core.Instances = _
 
-  def getCandidates(t: EntityT): Set[Int] = {
+  val candidateMatches = for(idx <- 0 until targetLen) yield getCandidates(targetAr(idx))
+
+  /*
+    Given a target entity `t`, it returns a set of its candidates ids.
+    During iteration, a `frequencyMap` -that counts the number of common tiles
+    between `t` and each candidate entity- is also computed.
+   */
+  def getCandidates(targetEntity: EntityT): Set[Int] = {
     var candidateMatches = Set[Int]()
     val frequencyMap: CandidateSet = CandidateSet()
-    val candidates = getAllCandidatesWithIndex(t, sourceIndex, partitionBorder)
-    candidates.foreach { case (i, _) =>
-      frequencyMap.increment(i)
-      candidateMatches += i
+    // retrieve candidates
+    val candidates = getAllCandidatesWithIndex(targetEntity, sourceIndex, partitionBorder)
+    // get the ids of each candidate and update the number
+    // of common tiles between `t` and each candidate
+    candidates.foreach { case (candidateID, _) =>
+      frequencyMap.increment(candidateID)
+      candidateMatches += candidateID
     }
+    // append `frequencyMap` to a list
     featureSet.freqArray += frequencyMap
+    // return set of ids
     candidateMatches
   }
 
-  def getCandidates(p: SamplePairT): (Int, Int, Int) = {
-    val t = p.getTargetGeometry
-    val tID = p.getTargetId
-    var candidateMatches = Set[Int]()
-    val frequencyMap: CandidateSet = CandidateSet()
-    val candidates = getAllCandidatesWithIndex(t, sourceIndex, partitionBorder)
-    candidates.foreach { case (i, _) =>
-      frequencyMap.increment(i)
-      candidateMatches += i
-    }
-    featureSet.freqArray(tID) = frequencyMap
-    featureSet.getCandStats(t, candidateMatches, tID)
+  /*
+    Returns a tuple of (a, b, c), where
+      a: is the number of common tiles between the candidate geometries
+      b: is the number of distinct candidates
+      c: is the number of total candidates with common tiles
+   */
+  def candidateStatistics(pair: SamplePairT): (Int, Int, Int) = {
+    val targetEntity = pair.getTargetGeometry
+    val targetID = pair.getTargetId
+    featureSet.getcandidateStatistics(targetEntity, candidateMatches(targetID), targetID)
   }
 
   /*
-   ...
+    Iterates through source and target geometries to pre-compute
+    relevant features that will be utilized during the training process.
    */
   override def preprocessing: Supervised = {
-    // no geometries lie in this partition
+    // no entities lie in this partition
     if (sourceLen < 1) return this
     // compute features (F1)-(F4)-(F7)-(F9)
-    source.foreach(s => featureSet.updateSourceStats(s, tileGranularities))
+    source.foreach(sourceEntity => featureSet.updateSourceStats(sourceEntity, tileGranularities))
+
+    // collect a number of random candidates
     assert(maxCandidatePairs > SAMPLE_SIZE)
     val random = scala.util.Random
-    val pairIds = scala.collection.mutable.HashSet[Integer]()
-    // collect a number of random candidates
-    while (pairIds.size < SAMPLE_SIZE) {
-      pairIds.add(random.nextInt(maxCandidatePairs))
-    }
-
+    val pairIds = random.shuffle(0 until maxCandidatePairs toSet).take(SAMPLE_SIZE)
     var pairID = 0
-    targetAr.indices.foreach { idx =>
-      val t = targetAr(idx)
+    val totalCandidates = candidateMatches.size
+
+    // iterate through target entities to
+    // compute relevant features
+    targetAr.indices.foreach { targetID =>
+      val targetEntity = targetAr(targetID)
       // compute features (F2)-(F5)-(F8)-(F10)
-      featureSet.updateTargetStats(t, tileGranularities)
+      featureSet.updateTargetStats(targetEntity, tileGranularities)
       var co_occurrences = 0
-      var candidates = 0
-      val candidateMatches = getCandidates(t)
-      candidateMatches.foreach { cID =>
-        co_occurrences += featureSet.updateCandStats(cID, idx)
-        val c = source(cID)
-        val intersects = featureSet.updateIntersectionStats(c, t, cID, idx)
+      var realCandidates = 0
+      val targetMatches = candidateMatches(targetID)
+      // for each candidate in set
+      targetMatches.foreach { candidateID =>
+        // update variables for (F11) to (F16)
+        co_occurrences += featureSet.updateCandStats(candidateID, targetID)
+        val candidateEntity = source(candidateID)
+        // if the two entities have common tiles, then they probably have a topological relation
+        val intersects = featureSet.updateIntersectionStats(candidateEntity, targetEntity, candidateID, targetID)
         if (intersects) {
-          candidates += 1
+          realCandidates += 1
+          // randomly choose a `targetEntity` - `candidateEntity`
+          // pair to sample for the training process
           if (pairIds.contains(pairID)) {
-            featureSet.addMatch(SamplePairT(cID, idx, c, t))
+            featureSet.addMatch(SamplePairT(candidateID, targetID, candidateEntity, targetEntity))
           }
           pairID += 1
         }
       }
-      featureSet.updateTargetStats(co_occurrences, candidateMatches.size, candidates)
+      // update features (F14)-(F15)-(F16)
+      featureSet.updateTargetStats(co_occurrences, targetMatches.size, realCandidates)
     }
+    // update features (F11)-(F12)-(F13)
     featureSet.updateSourceStats()
     this
   }
 
-  def train(posCands: Seq[(Int, Int, Int)], negCands: Seq[(Int, Int, Int)], pPairs: ListBuffer[SamplePairT],
-            nPairs: ListBuffer[SamplePairT], sz: Int): weka.core.Instances =
-    featureSet.train(posCands, negCands, pPairs, nPairs, sz)
+  /*
+    Trains a local Logistic Regression classifier
+   */
+  def train(posOccurencies: Seq[(Int, Int, Int)], negOccurencies: Seq[(Int, Int, Int)],
+            positivePairs: ListBuffer[SamplePairT], negativePairs: ListBuffer[SamplePairT],
+            sz: Int): weka.core.Instances =
+    featureSet.train(posOccurencies, negOccurencies, positivePairs, negativePairs, sz)
 
+  /*
+    Creates a sampling set and trains a local Logistic Regression classifier
+   */
   override def buildClassifier: Supervised = {
+    // no entities lie in this partition
     if (sourceLen < 1) return this
 
+    // create a balanced sample of related and non-related entity pairs
     val (positivePairs, negativePairs) = featureSet.trainSampling
     val sz = if (positivePairs.size < negativePairs.size) positivePairs.size else negativePairs.size
+    // no positive or negative pairs exist
     if (sz < 1) return this
 
-    val posCands: Seq[(Int, Int, Int)] = for (idx <- 0 until sz)
-      yield getCandidates(positivePairs(idx))
+    // obtain a sequence of candidate-relevant statistics to use
+    // during the training process
+    val posOccurencies: Seq[(Int, Int, Int)] = for (idx <- 0 until sz)
+      yield candidateStatistics(positivePairs(idx))
+    val negOccurencies: Seq[(Int, Int, Int)] = for (idx <- 0 until  sz)
+      yield candidateStatistics(negativePairs(idx))
 
-    val negCands: Seq[(Int, Int, Int)] = for (idx <- 0 until  sz)
-      yield getCandidates(negativePairs(idx))
-
-    this.trainSet = train(posCands, negCands, positivePairs, negativePairs, sz)
+    // train classifier
+    this.trainSet = train(posOccurencies, negOccurencies, positivePairs, negativePairs, sz)
     this
   }
 
+  /*
+    Prioritizes pairs-to-be examined based on their classification probability.
+   */
   override def prioritize(relation: Relation): ComparisonPQ = {
-    var posDecisions = 0
     var totalDecisions = 0
     val localBudget = math.ceil((budget * source.length.toDouble) / totalSourceEntities.toDouble).toLong
     val pq: StaticComparisonPQ = StaticComparisonPQ(localBudget)
 
-    featureSet.freqArray = scala.collection.mutable.ListBuffer[CandidateSet]()
-
     if (sourceLen < 1 || this.trainSet == null) return pq
+
+    val totalCandidates = candidateMatches.size
 
     var counter = 0
     targetAr.indices.foreach { idx =>
       val t = targetAr(idx)
-      val candidateMatches = getCandidates(t)
-      var rPairs = 0
-      val dPairs = candidateMatches.size
-      var tPairs = 0
-      candidateMatches.foreach { cID =>
-        val candidateStats = this.featureSet.isValid(cID, t, idx)
-        tPairs += candidateStats._1
-        rPairs += candidateStats._2
+      val targetMatches = candidateMatches(idx)
+      var realPairs = 0
+      val distinctPairs = targetMatches.size
+      var totalPairs = 0
+      targetMatches.foreach { candidateID =>
+        val (entityFrequency, isValid) = this.featureSet.isValid(candidateID, t, idx)
+        totalPairs += entityFrequency
+        realPairs += isValid
       }
-      candidateMatches.foreach { cID =>
-        val lrProbs = featureSet.getProbability(this.trainSet, cID, t, idx, tPairs, dPairs, rPairs)
+      targetMatches.foreach { candidateID =>
+        val lrProbs = featureSet.getProbability(this.trainSet, candidateID, t, idx, totalPairs, distinctPairs, realPairs)
         if (!lrProbs.isEmpty) {
           totalDecisions += 1
-          val c = source(cID)
+          val candidateEntity = source(candidateID)
           if (lrProbs(0) < lrProbs(1)) {
-            //  posDecisions += 1
             val w = lrProbs(1).toFloat
-            val wp = weightedPairFactory.createWeightedPair(counter, c, cID, t, idx, w)
+            val wp = weightedPairFactory.createWeightedPair(counter, candidateEntity, candidateID, t, idx, w)
             pq.enqueue(wp)
             counter += 1
           }

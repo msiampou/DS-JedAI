@@ -316,6 +316,8 @@ object DistributedProgressiveInterlinking {
 
     def supervisedTrain(linkersRDD: RDD[ProgressiveLinkerT]): RDD[ProgressiveLinkerT] = {
         val preprocessingRDD = linkersRDD.map(linker => linker.preprocessing)
+        // invoke execution
+        preprocessingRDD.count()
         val trainRDD = preprocessingRDD.map(linker => linker.buildClassifier)
         trainRDD
     }
