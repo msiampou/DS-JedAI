@@ -13,6 +13,9 @@ import utils.configuration.Constants.WeightingFunction.WeightingFunction
 import scala.collection.mutable.ListBuffer
 import scala.language.postfixOps
 
+/*
+ * Supervised Scheduling for Progressive Geospatial Interlinking
+ */
 case class Supervised (source: Array[EntityT],
                        target: Iterable[EntityT],
                        tileGranularities: TileGranularities,
@@ -38,7 +41,8 @@ case class Supervised (source: Array[EntityT],
   val featureSet: FeatureSet = FeatureSet(CLASS_SIZE, NUM_FEATURES, SAMPLE_SIZE, sourceLen, source, tileGranularities, targetLen)
   var trainSet: weka.core.Instances = _
 
-  val candidateMatches = for(idx <- 0 until targetLen) yield getCandidates(targetAr(idx))
+  // pr-ecompute the candidates of each target entity
+  val candidateMatches = for(idx<-0 until targetLen) yield getCandidates(targetAr(idx))
 
   /*
     Given a target entity `t`, it returns a set of its candidates ids.
@@ -57,7 +61,7 @@ case class Supervised (source: Array[EntityT],
       candidateMatches += candidateID
     }
     // append `frequencyMap` to a list
-    featureSet.freqArray += frequencyMap
+    featureSet.addMatch(frequencyMap)
     // return set of ids
     candidateMatches
   }
@@ -85,7 +89,6 @@ case class Supervised (source: Array[EntityT],
     source.foreach(sourceEntity => featureSet.updateSourceStats(sourceEntity, tileGranularities))
 
     // collect a number of random candidates
-    assert(maxCandidatePairs > SAMPLE_SIZE)
     val random = scala.util.Random
     val pairIds = random.shuffle(0 until maxCandidatePairs toSet).take(SAMPLE_SIZE)
     var pairID = 0
@@ -166,11 +169,11 @@ case class Supervised (source: Array[EntityT],
     val localBudget = math.ceil((budget * source.length.toDouble) / totalSourceEntities.toDouble).toLong
     val pq: StaticComparisonPQ = StaticComparisonPQ(localBudget)
 
+    // no entities lie in this partition
     if (sourceLen < 1 || this.trainSet == null) return pq
 
-    val totalCandidates = candidateMatches.size
-
     var counter = 0
+    val totalCandidates = candidateMatches.size
     targetAr.indices.foreach { idx =>
       val t = targetAr(idx)
       val targetMatches = candidateMatches(idx)
@@ -182,11 +185,13 @@ case class Supervised (source: Array[EntityT],
         totalPairs += entityFrequency
         realPairs += isValid
       }
+      // get the classification probability of each pair of entities
       targetMatches.foreach { candidateID =>
         val lrProbs = featureSet.getProbability(this.trainSet, candidateID, t, idx, totalPairs, distinctPairs, realPairs)
         if (!lrProbs.isEmpty) {
           totalDecisions += 1
           val candidateEntity = source(candidateID)
+          // if a pair is classified as a related add it to queue
           if (lrProbs(0) < lrProbs(1)) {
             val w = lrProbs(1).toFloat
             val wp = weightedPairFactory.createWeightedPair(counter, candidateEntity, candidateID, t, idx, w)

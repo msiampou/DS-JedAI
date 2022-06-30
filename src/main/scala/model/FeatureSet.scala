@@ -8,6 +8,9 @@ import utils.configuration.Constants.{CommonTiles, IntersectionArea, Label, Sour
 
 import scala.collection.mutable.ListBuffer
 
+/*
+ * Holds helper methods for Supervised Scheduling.
+ */
 case class FeatureSet (class_size: Int,
                        n_features: Int,
                        sample_size: Int,
@@ -40,8 +43,6 @@ case class FeatureSet (class_size: Int,
   val vPairs: scala.collection.mutable.HashSet[VerifiedPair] = scala.collection.mutable.HashSet[VerifiedPair]()
 
   val freqArray: scala.collection.mutable.ListBuffer[CandidateSet] = scala.collection.mutable.ListBuffer[CandidateSet]()
-//  var flags = Array.fill[Int](datasetDelimiter)(0)
-//  var frequency = Array.fill[Int](datasetDelimiter)(0)
   var distinctCooccurrences: CandidateSet = CandidateSet()
   var totalCooccurrences: CandidateSet = CandidateSet()
   var realCandidates: CandidateSet = CandidateSet()
@@ -79,6 +80,8 @@ case class FeatureSet (class_size: Int,
   }
 
   def addMatch(pair: SamplePairT): Unit = sample += pair
+
+  def addMatch(set: CandidateSet): Unit = freqArray += set
 
   def updateSourceStats(): Unit = {
     for (i <- 0 to datasetDelimiter) {

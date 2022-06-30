@@ -95,7 +95,7 @@ object SupervisedExp {
     val partitionBorder = partitioner.getPartitionsBorders(theta)
     log.info(s"DS-JEDAI: Source was loaded into ${sourceRDD.getNumPartitions} partitions")
 
-    log.info(s"DS-JEDAI: Initializing linkers..")
+    // time experiment
     if (timeExp) {
       // invoke load of target
       val linkers = DistributedProgressiveInterlinking.initializeProgressiveLinkers(sourceRDD, targetRDD,
@@ -111,7 +111,9 @@ object SupervisedExp {
       log.info(s"DS-JEDAI: Train time: $trainTime")
       log.info(s"DS-JEDAI: Verification Time: $verificationTime")
 
-    } else {
+    }
+    // evaluation experiment
+    else {
       // to compute recall and precision we need overall results
       val (totalVerifications, totalRelatedPairs) =
         (conf.getTotalVerifications, conf.getTotalQualifyingPairs) match {
@@ -125,8 +127,6 @@ object SupervisedExp {
 
       log.info("DS-JEDAI: Total Verifications: " + totalVerifications)
       log.info("DS-JEDAI: Qualifying Pairs : " + totalRelatedPairs)
-      log.info("\n")
-      // val totalRelatedPairs = 2401389
 
       val wf: (WeightingFunction, Option[WeightingFunction]) = (mainWF, secondaryWF)
       printEvaluationResults(sourceRDD, targetRDD, theta, partitionBorder, approximateSourceCount,
@@ -143,7 +143,6 @@ object SupervisedExp {
     val linkers = DistributedProgressiveInterlinking.initializeProgressiveLinkers(sRDD, tRDD,
       partitionBorders, theta, partitioner, algorithm, budget, sourceCount, ws, wf._1, wf._2)
 
-
     val trainRDD = DistributedProgressiveInterlinking.supervisedTrain(linkers)
     trainRDD.count()
     log.info(s"DS-JEDAI: Train-End")
@@ -158,7 +157,6 @@ object SupervisedExp {
       log.info(s"DS-JEDAI: ${algorithm.toString} Recall: ${qp.toDouble / qualifiedPairsWithinBudget.toDouble}")
       log.info(s"DS-JEDAI: ${algorithm.toString} Precision: ${qp.toDouble / verifications.toDouble}")
       log.info(s"DS-JEDAI: ${algorithm.toString} PGR: $pgr")
-      log.info("\n")
     }
   }
 }
