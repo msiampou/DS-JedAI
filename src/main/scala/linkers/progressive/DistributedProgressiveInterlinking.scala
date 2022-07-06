@@ -2,15 +2,8 @@ package linkers.progressive
 
 import cats.implicits._
 import model.entities.EntityT
-import model.weightedPairs.SamplePairT
-import model.{FeatureSet, IM, TileGranularities}
-import org.apache.log4j.{Level, LogManager, Logger}
-import org.apache.spark.ml.classification.LogisticRegression
-import org.apache.spark.ml.feature.VectorAssembler
+import model.{IM, TileGranularities}
 import org.apache.spark.rdd.RDD
-import org.apache.spark.sql
-import org.apache.spark.sql.types.{DoubleType, StructField, StructType}
-import org.apache.spark.sql.{Dataset, Row, SparkSession}
 import org.locationtech.jts.geom.Envelope
 import utils.configuration.Constants
 import utils.configuration.Constants.ProgressiveAlgorithm.ProgressiveAlgorithm
@@ -140,23 +133,24 @@ object DistributedProgressiveInterlinking {
      * Measure the time for the Scheduling and Verification steps
      * @return the Scheduling, the Verification and the Total Matching times as a Tuple
      */
-    def time(progressiveLinkersRDD: RDD[ProgressiveLinkerT]): (Double, Double, Double) ={
+    def time(linkersRDD: RDD[ProgressiveLinkerT]): (Double, Double, Double) ={
         // execute and time scheduling step
-        val schedulingStart = Calendar.getInstance().getTimeInMillis
-        val prioritizationResults = progressiveLinkersRDD.map{ linker => linker.prioritize(Relation.DE9IM)}
-        // invoke execution
-        prioritizationResults.count()
-        val schedulingTime = (Calendar.getInstance().getTimeInMillis - schedulingStart) / 1000.0
+        val preprocessingStart = Calendar.getInstance().getTimeInMillis
+        val preprocessingRDD = linkersRDD.map(linker => linker.preprocessing)
+        preprocessingRDD.count()
+        val preprocessingTime = (Calendar.getInstance().getTimeInMillis - preprocessingStart) / 1000.0
 
-        // execute and time thw whole matching procedure
-        val matchingTimeStart = Calendar.getInstance().getTimeInMillis
-        // invoke execution
-        countAllRelations(progressiveLinkersRDD)
-        val matchingTime = (Calendar.getInstance().getTimeInMillis - matchingTimeStart) / 1000.0
-        // the verification time is the matching time - the scheduling time
-        val verificationTime = matchingTime - schedulingTime
+        val trainStart = Calendar.getInstance().getTimeInMillis
+        val trainRDD = preprocessingRDD.map(linker => linker.buildClassifier)
+        trainRDD.count()
+        val trainTime = (Calendar.getInstance().getTimeInMillis - trainStart) / 1000.0
 
-        (schedulingTime, verificationTime, schedulingTime+verificationTime)
+        val verificationStart = Calendar.getInstance().getTimeInMillis
+        val verificationRDD = trainRDD.map(linker => linker.prioritize(Relation.DE9IM))
+        verificationRDD.count()
+        val verificationTime = (Calendar.getInstance().getTimeInMillis - verificationStart) / 1000.0
+
+        (preprocessingTime, trainTime, verificationTime)
     }
 
     /**
@@ -296,28 +290,27 @@ object DistributedProgressiveInterlinking {
     }
 
     def supervisedTime(linkersRDD: RDD[ProgressiveLinkerT]): (Double, Double, Double) = {
-        val preprocessingStart = Calendar.getInstance().getTimeInMillis
+        // execute and time scheduling step
+        val schedulingStart = Calendar.getInstance().getTimeInMillis
         val preprocessingRDD = linkersRDD.map(linker => linker.preprocessing)
-        preprocessingRDD.count()
-        val preprocessingTime = (Calendar.getInstance().getTimeInMillis - preprocessingStart) / 1000.0
-
-        val trainStart = Calendar.getInstance().getTimeInMillis
         val trainRDD = preprocessingRDD.map(linker => linker.buildClassifier)
-        trainRDD.count()
-        val trainTime = (Calendar.getInstance().getTimeInMillis - trainStart) / 1000.0
-
-        val verificationStart = Calendar.getInstance().getTimeInMillis
         val verificationRDD = trainRDD.map(linker => linker.prioritize(Relation.DE9IM))
         verificationRDD.count()
-        val verificationTime = (Calendar.getInstance().getTimeInMillis - verificationStart) / 1000.0
+        val schedulingTime = (Calendar.getInstance().getTimeInMillis - schedulingStart) / 1000.0
 
-        (preprocessingTime, trainTime, verificationTime)
+        // execute and time thw whole matching procedure
+        val matchingTimeStart = Calendar.getInstance().getTimeInMillis
+        // invoke execution
+        countAllRelations(trainRDD)
+        val matchingTime = (Calendar.getInstance().getTimeInMillis - matchingTimeStart) / 1000.0
+        // the verification time is the matching time - the scheduling time
+        val verificationTime = math.abs(matchingTime - schedulingTime)
+
+        (schedulingTime, verificationTime, schedulingTime+verificationTime)
     }
 
     def supervisedTrain(linkersRDD: RDD[ProgressiveLinkerT]): RDD[ProgressiveLinkerT] = {
         val preprocessingRDD = linkersRDD.map(linker => linker.preprocessing)
-        // invoke execution
-        preprocessingRDD.count()
         val trainRDD = preprocessingRDD.map(linker => linker.buildClassifier)
         trainRDD
     }

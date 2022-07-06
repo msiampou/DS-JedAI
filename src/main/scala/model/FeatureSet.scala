@@ -11,61 +11,32 @@ import scala.collection.mutable.ListBuffer
 /*
  * Holds helper methods for Supervised Scheduling.
  */
-case class FeatureSet (class_size: Int,
-                       n_features: Int,
-                       sample_size: Int,
-                       datasetDel: Int,
-                       sourceAr: Array[EntityT],
-                       tileGranularities: TileGranularities,
-                       targetLen: Int
-                      ) {
 
-  val CLASS_SIZE: Int = class_size
-  val NO_OF_FEATURES: Int = n_features
-  val SAMPLE_SIZE: Int = sample_size
+sealed trait FeatureStatistics {
 
+  val NO_OF_FEATURES: Int = 16
   val POSITIVE_PAIR: Int = 1
   val NEGATIVE_PAIR: Int = 0
 
   val RELATED: String = "related"
   val NON_RELATED: String = "nonrelated"
 
-  val source: Array[EntityT] = sourceAr
-  val datasetDelimiter: Int = datasetDel
-  val THETA: TileGranularities = tileGranularities
-
   val maxFeatures = Array.fill[Double](NO_OF_FEATURES)(Double.MinValue)
   val minFeatures = Array.fill[Double](NO_OF_FEATURES)(Double.MaxValue)
-
-  val attributes: java.util.ArrayList[weka.core.Attribute] = this.getAttributes
 
   val sample: scala.collection.mutable.ListBuffer[SamplePairT] = scala.collection.mutable.ListBuffer[SamplePairT]()
   val vPairs: scala.collection.mutable.HashSet[VerifiedPair] = scala.collection.mutable.HashSet[VerifiedPair]()
 
   val freqArray: scala.collection.mutable.ListBuffer[CandidateSet] = scala.collection.mutable.ListBuffer[CandidateSet]()
+
   var distinctCooccurrences: CandidateSet = CandidateSet()
   var totalCooccurrences: CandidateSet = CandidateSet()
   var realCandidates: CandidateSet = CandidateSet()
 
-  val clf: weka.classifiers.Classifier = new weka.classifiers.functions.Logistic()
-
-  def getDatasetDelimiter: Int = datasetDelimiter
-
-  def getSampleSize: Int = SAMPLE_SIZE
-
-  def getAttributes: java.util.ArrayList[weka.core.Attribute] = {
-    val attributes = new java.util.ArrayList[weka.core.Attribute]()
-    for (idx <- 0 until  NO_OF_FEATURES) {
-      val attr = new weka.core.Attribute("_" + idx)
-      attributes.add(attr)
-    }
-    val classLabels = new java.util.ArrayList[String]()
-    classLabels.add(NON_RELATED)
-    classLabels.add(RELATED)
-    val classAttribute = new weka.core.Attribute("class", classLabels)
-    attributes.add(classAttribute)
-    attributes
-  }
+  val source: Array[EntityT]
+  val datasetDelimiter: Int
+  val THETA: TileGranularities
+  val CLASS_SIZE: Int
 
   def update(featurePos: Int, value: Double): Unit = {
     if (maxFeatures(featurePos) < value) maxFeatures(featurePos) = value
@@ -83,7 +54,7 @@ case class FeatureSet (class_size: Int,
 
   def addMatch(set: CandidateSet): Unit = freqArray += set
 
-  def updateSourceStats(): Unit = {
+  def updateSourceStats : Unit = {
     for (i <- 0 to datasetDelimiter) {
       update(SourceTotalCooccurrences.value, totalCooccurrences.get(i))
       update(SourceDistCooccurrences.value, distinctCooccurrences.get(i))
@@ -124,7 +95,7 @@ case class FeatureSet (class_size: Int,
     retVal
   }
 
-  def getcandidateStatistics(t: EntityT, candSet: Set[Int], idx: Int): (Int, Int, Int) = {
+  def getcandidateStatistics(t: EntityT, candSet: Seq[Int], idx: Int): (Int, Int, Int) = {
     var co_occurrences = 0
     var d_co_occurrences = 0
     var t_co_occurrences = 0
@@ -136,6 +107,30 @@ case class FeatureSet (class_size: Int,
       if (intersects) t_co_occurrences += 1
     }
     (co_occurrences, d_co_occurrences, t_co_occurrences)
+  }
+}
+
+case class FeatureVector (CLASS_SIZE: Int,
+                          datasetDelimiter: Int,
+                          source: Array[EntityT],
+                          THETA: TileGranularities) extends FeatureStatistics {
+
+  val attributes: java.util.ArrayList[weka.core.Attribute] = this.getAttributes
+  val clf: weka.classifiers.Classifier = new weka.classifiers.functions.Logistic()
+
+
+  def getAttributes: java.util.ArrayList[weka.core.Attribute] = {
+    val attributes = new java.util.ArrayList[weka.core.Attribute]()
+    for (idx <- 0 until  NO_OF_FEATURES) {
+      val attr = new weka.core.Attribute("_" + idx)
+      attributes.add(attr)
+    }
+    val classLabels = new java.util.ArrayList[String]()
+    classLabels.add(NON_RELATED)
+    classLabels.add(RELATED)
+    val classAttribute = new weka.core.Attribute("class", classLabels)
+    attributes.add(classAttribute)
+    attributes
   }
 
   def getFeatures(s: EntityT, t: EntityT, sID: Int, tID: Int, total: Int, distinct: Int, real: Int,

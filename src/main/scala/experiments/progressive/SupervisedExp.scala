@@ -103,13 +103,13 @@ object SupervisedExp {
         mainWF, secondaryWF)
       targetRDD.count()
       val expTime = DistributedProgressiveInterlinking.supervisedTime(linkers)
-      val preprocessingTime = expTime._1
-      val trainTime = expTime._2
-      val verificationTime = expTime._3
+      val schedulingTime = expTime._1
+      val verificationTime = expTime._2
+      val matchingTime = expTime._3
 
-      log.info(s"DS-JEDAI: Preprocessing time: $preprocessingTime")
-      log.info(s"DS-JEDAI: Train time: $trainTime")
-      log.info(s"DS-JEDAI: Verification Time: $verificationTime")
+      log.info(s"DS-JEDAI: Preprocessing time: $schedulingTime")
+      log.info(s"DS-JEDAI: Train time: $verificationTime")
+      log.info(s"DS-JEDAI: Verification Time: $matchingTime")
 
     }
     // evaluation experiment
@@ -126,12 +126,14 @@ object SupervisedExp {
         }
 
       log.info("DS-JEDAI: Total Verifications: " + totalVerifications)
+      //val totalRelatedPairs = 199122
       log.info("DS-JEDAI: Qualifying Pairs : " + totalRelatedPairs)
-
+//
       val wf: (WeightingFunction, Option[WeightingFunction]) = (mainWF, secondaryWF)
       printEvaluationResults(sourceRDD, targetRDD, theta, partitionBorder, approximateSourceCount,
         partitioner, totalRelatedPairs, budget, progressiveAlg, wf, weightingScheme)
     }
+
   }
   def printEvaluationResults(sRDD: RDD[(Int, EntityT)], tRDD: RDD[(Int, EntityT)],
                              theta: TileGranularities, partitionBorders: Array[Envelope],
@@ -144,7 +146,6 @@ object SupervisedExp {
       partitionBorders, theta, partitioner, algorithm, budget, sourceCount, ws, wf._1, wf._2)
 
     val trainRDD = DistributedProgressiveInterlinking.supervisedTrain(linkers)
-    trainRDD.count()
     log.info(s"DS-JEDAI: Train-End")
     val evaluation = DistributedProgressiveInterlinking.evaluate(algorithm, trainRDD, relation, n, totalRelations, takeBudget)
     log.info(s"DS-JEDAI: Evaluating")

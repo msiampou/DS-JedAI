@@ -38,10 +38,10 @@ case class Supervised (source: Array[EntityT],
   val SAMPLE_SIZE: Int = (0.6*(sourceLen+targetLen)).toInt
   val CLASS_SIZE: Int = SAMPLE_SIZE/2
 
-  val featureSet: FeatureSet = FeatureSet(CLASS_SIZE, NUM_FEATURES, SAMPLE_SIZE, sourceLen, source, tileGranularities, targetLen)
+  val featureSet: FeatureVector = FeatureVector(CLASS_SIZE, sourceLen, source, tileGranularities)
   var trainSet: weka.core.Instances = _
 
-  // pr-ecompute the candidates of each target entity
+  // precompute the candidates of each target entity
   val candidateMatches = for(idx<-0 until targetLen) yield getCandidates(targetAr(idx))
 
   /*
@@ -49,7 +49,7 @@ case class Supervised (source: Array[EntityT],
     During iteration, a `frequencyMap` -that counts the number of common tiles
     between `t` and each candidate entity- is also computed.
    */
-  def getCandidates(targetEntity: EntityT): Set[Int] = {
+  def getCandidates(targetEntity: EntityT): Seq[Int] = {
     var candidateMatches = Set[Int]()
     val frequencyMap: CandidateSet = CandidateSet()
     // retrieve candidates
@@ -63,7 +63,7 @@ case class Supervised (source: Array[EntityT],
     // append `frequencyMap` to a list
     featureSet.addMatch(frequencyMap)
     // return set of ids
-    candidateMatches
+    candidateMatches.toSeq
   }
 
   /*
@@ -92,7 +92,6 @@ case class Supervised (source: Array[EntityT],
     val random = scala.util.Random
     val pairIds = random.shuffle(0 until maxCandidatePairs toSet).take(SAMPLE_SIZE)
     var pairID = 0
-    val totalCandidates = candidateMatches.size
 
     // iterate through target entities to
     // compute relevant features
@@ -124,7 +123,7 @@ case class Supervised (source: Array[EntityT],
       featureSet.updateTargetStats(co_occurrences, targetMatches.size, realCandidates)
     }
     // update features (F11)-(F12)-(F13)
-    featureSet.updateSourceStats()
+    featureSet.updateSourceStats
     this
   }
 
@@ -173,7 +172,6 @@ case class Supervised (source: Array[EntityT],
     if (sourceLen < 1 || this.trainSet == null) return pq
 
     var counter = 0
-    val totalCandidates = candidateMatches.size
     targetAr.indices.foreach { idx =>
       val t = targetAr(idx)
       val targetMatches = candidateMatches(idx)
@@ -196,9 +194,9 @@ case class Supervised (source: Array[EntityT],
             val w = lrProbs(1).toFloat
             val wp = weightedPairFactory.createWeightedPair(counter, candidateEntity, candidateID, t, idx, w)
             pq.enqueue(wp)
-            counter += 1
           }
         }
+        counter += 1
       }
     }
     pq
