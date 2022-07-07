@@ -86,6 +86,8 @@ sealed trait ConfigurationT {
     // returns the CONF_ITERATIONS argument, used for Supervised GIAnt
     def getIterations: Int = configurations.getOrElse(InputConfigurations.CONF_ITERATIONS, "1").toInt
 
+    def evalMetrics: Boolean = configurations.contains(InputConfigurations.CONF_EVALUATION)
+
     def print(log: Logger): Unit = {
         log.info(s"DS-JEDAI: GridType: $getGridType")
         log.info(s"DS-JEDAI: Relation: $relation")

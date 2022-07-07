@@ -78,6 +78,7 @@ object SupervisedExp {
       else conf.getSecondaryWF
 
     val timeExp: Boolean = conf.measureStatistic
+    val evalExp: Boolean = conf.evalMetrics
 
     // load datasets
     val sourceSpatialRDD: SpatialRDD[Geometry] = Reader.read(conf.source)
@@ -95,13 +96,14 @@ object SupervisedExp {
     val partitionBorder = partitioner.getPartitionsBorders(theta)
     log.info(s"DS-JEDAI: Source was loaded into ${sourceRDD.getNumPartitions} partitions")
 
-    // time experiment
     if (timeExp) {
-      // invoke load of target
+      // initialize linkers
       val linkers = DistributedProgressiveInterlinking.initializeProgressiveLinkers(sourceRDD, targetRDD,
         partitionBorder, theta, partitioner, progressiveAlg, budget, approximateSourceCount, weightingScheme,
         mainWF, secondaryWF)
+      // invoke target execution
       targetRDD.count()
+      // calculate time
       val expTime = DistributedProgressiveInterlinking.supervisedTime(linkers)
       val schedulingTime = expTime._1
       val verificationTime = expTime._2
@@ -111,9 +113,7 @@ object SupervisedExp {
       log.info(s"DS-JEDAI: Train time: $verificationTime")
       log.info(s"DS-JEDAI: Verification Time: $matchingTime")
 
-    }
-    // evaluation experiment
-    else {
+    } else if (evalExp) {
       // to compute recall and precision we need overall results
       val (totalVerifications, totalRelatedPairs) =
         (conf.getTotalVerifications, conf.getTotalQualifyingPairs) match {
@@ -126,12 +126,37 @@ object SupervisedExp {
         }
 
       log.info("DS-JEDAI: Total Verifications: " + totalVerifications)
-      //val totalRelatedPairs = 199122
       log.info("DS-JEDAI: Qualifying Pairs : " + totalRelatedPairs)
-//
+
       val wf: (WeightingFunction, Option[WeightingFunction]) = (mainWF, secondaryWF)
       printEvaluationResults(sourceRDD, targetRDD, theta, partitionBorder, approximateSourceCount,
         partitioner, totalRelatedPairs, budget, progressiveAlg, wf, weightingScheme)
+    } else {
+      // initialize linkers
+      val linkers = DistributedProgressiveInterlinking.initializeProgressiveLinkers(sourceRDD, targetRDD,
+        partitionBorder, theta, partitioner, progressiveAlg, budget, approximateSourceCount, weightingScheme,
+        mainWF, secondaryWF)
+      // preprocess & train
+      val trainRDD = DistributedProgressiveInterlinking.supervisedTrain(linkers)
+      // count relations
+      val (totalContains, totalCoveredBy, totalCovers, totalCrosses, totalEquals, totalIntersects,
+      totalOverlaps, totalTouches, totalWithin, verifications, qp) = DistributedProgressiveInterlinking.countAllRelations(trainRDD)
+
+      val totalRelations = totalContains + totalCoveredBy + totalCovers + totalCrosses + totalEquals +
+        totalIntersects + totalOverlaps + totalTouches + totalWithin
+      log.info("DS-JEDAI: Total Verifications: " + verifications)
+      log.info("DS-JEDAI: Qualifying Pairs : " + qp)
+
+      log.info("DS-JEDAI: CONTAINS: " + totalContains)
+      log.info("DS-JEDAI: COVERED BY: " + totalCoveredBy)
+      log.info("DS-JEDAI: COVERS: " + totalCovers)
+      log.info("DS-JEDAI: CROSSES: " + totalCrosses)
+      log.info("DS-JEDAI: EQUALS: " + totalEquals)
+      log.info("DS-JEDAI: INTERSECTS: " + totalIntersects)
+      log.info("DS-JEDAI: OVERLAPS: " + totalOverlaps)
+      log.info("DS-JEDAI: TOUCHES: " + totalTouches)
+      log.info("DS-JEDAI: WITHIN: " + totalWithin)
+      log.info("DS-JEDAI: Total Relations Discovered: " + totalRelations)
     }
 
   }

@@ -132,6 +132,7 @@ object Constants {
 
 		// SUPERVISED PROGRESSIVE GIANT
 		val CONF_ITERATIONS = "num_iterations"
+		val CONF_EVALUATION = "eval"
 	}
 
 	object GridType extends Enumeration{
